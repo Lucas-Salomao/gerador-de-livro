@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 # Bibliotecas para LangGraph
 from langgraph.graph import StateGraph, END
-from langgraph.checkpoint import MemorySaver
+from langgraph.checkpoint.memory import MemorySaver
 import langchain
 
 # Bibliotecas para Gemini/Vertex AI
@@ -25,7 +25,7 @@ load_dotenv()
 # Inicializar Vertex AI
 def init_vertex_ai(project_id: str, location: str = "us-central1"):
     """Inicializa a conexão com o Vertex AI."""
-    vertexai.init(project=project_id, location=location)
+    vertexai.init(project=os.getenv("PROJECT_ID"), location=os.getenv("LOCATION"))
     return GenerativeModel("gemini-1.5-pro")
 
 # Definição dos estados do grafo
@@ -276,13 +276,12 @@ def create_book_agent(model):
     return workflow.compile()
 
 # Função principal
-def main(project_id: str, 
-         custom_title: str = "", 
+def main(custom_title: str = "", 
          custom_genre: str = "", 
          custom_audience: str = ""):
     """Função principal para executar o agente de geração de livros."""
     # Inicializar o modelo
-    model = init_vertex_ai(project_id)
+    model = init_vertex_ai(os.getenv("PROJECT_ID"))
     
     # Criar o agente
     book_agent = create_book_agent(model)
@@ -328,12 +327,11 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description="Agente de geração de livros usando Gemini e LangGraph")
-    parser.add_argument("--project-id", required=True, help="ID do projeto Google Cloud")
     parser.add_argument("--title", default="", help="Título do livro (opcional)")
     parser.add_argument("--genre", default="", help="Gênero do livro (opcional)")
     parser.add_argument("--audience", default="", help="Público-alvo do livro (opcional)")
     
     args = parser.parse_args()
     
-    result = main(args.project_id, args.title, args.genre, args.audience)
+    result = main(args.title, args.genre, args.audience)
     print("Processo de geração de livro concluído!")
