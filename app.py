@@ -92,7 +92,7 @@ def get_book_info(state: BookState, model) -> Dict[str, Any]:
     Tema: {theme}
     Gênero: {genre}
     Público-Alvo: {target_audience}
-    Responda SOMENTE em formato JSON com a chave "title", sem texto adicional. Exemplo: {{"title": "Fundamentos de Exploração Espacial"}}
+    Responda SOMENTE em formato JSON com a chave "title", sem texto adicional. Exemplo: {{"title": "Fundamentos de Exploração Espacial"}}. Não inclua bloco de código, ou seja ```json```
     """
     
     logger.info("Gerando título com base no tema...")
@@ -122,6 +122,7 @@ def create_outline(state: BookState, model) -> Dict[str, Any]:
     Inclua entre 5 e 100 capítulos, cada um abordando um aspecto técnico ou prático do tema, com títulos objetivos e descrições que detalhem o conteúdo analítico a ser explorado.
     Responda SOMENTE em formato JSON com uma lista de objetos contendo "chapter_number", "chapter_title" e "chapter_description".
     Exemplo: [{{"chapter_number": 1, "chapter_title": "Princípios de Propulsão Espacial", "chapter_description": "Análise dos sistemas de propulsão usados em missões espaciais"}}]
+    Não inclua bloco de código, ou seja ```json```
     """
     
     response = model.generate_content(prompt)
