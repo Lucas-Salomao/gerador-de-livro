@@ -36,11 +36,21 @@ def init_vertex_ai(project_id: str, location: str = "us-central1"):
     """Inicializa a conexão com o Vertex AI."""
     logger.info("Inicializando Vertex AI...")
     vertexai.init(project=os.getenv("PROJECT_ID"), location=os.getenv("LOCATION"))
-    return GenerativeModel("gemini-1.5-pro")
+    return GenerativeModel("gemini-2.0-flash-001")
 
 # Função auxiliar para parsing seguro de JSON
 def safe_json_parse(response_text: str, fallback: Any) -> Any:
     """Tenta decodificar JSON e retorna um fallback em caso de erro."""
+    # Remove code block markers if present
+    if response_text.startswith("```json"):
+        response_text = response_text[7:]
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
+    elif response_text.startswith("```"):
+        response_text = response_text[3:]
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
+    
     try:
         return json.loads(response_text)
     except json.JSONDecodeError:
@@ -59,6 +69,7 @@ class BookState(TypedDict, total=False):
     status: str
     feedback: str
     export_path: str
+    feedback_path: str
 
 # Funções para cada etapa do processo
 def get_book_info(state: BookState, model) -> Dict[str, Any]:
@@ -75,14 +86,6 @@ def get_book_info(state: BookState, model) -> Dict[str, Any]:
     updates["theme"] = theme
     updates["genre"] = genre
     updates["target_audience"] = target_audience
-    
-    # prompt = f"""
-    # Você é um escritor de livros técnicos. Baseado no seguinte tema, gênero e público-alvo, sugira um título criativo e adequado:
-    # Tema: {theme}
-    # Gênero: {genre}
-    # Público-Alvo: {target_audience}
-    # Responda SOMENTE em formato JSON com a chave "title", sem texto adicional. Exemplo: {{"title": "Meu Título"}}
-    # """
     
     prompt = f"""
     Você é um especialista em redação técnica. Baseado no seguinte tema, gênero e público-alvo, sugira um título formal e técnico que reflita um enfoque analítico e informativo:
@@ -106,30 +109,17 @@ def get_book_info(state: BookState, model) -> Dict[str, Any]:
 def create_outline(state: BookState, model) -> Dict[str, Any]:
     """Cria o sumário do livro baseado nas informações fornecidas."""
     logger.info("Criando sumário do livro...")
-    # prompt = f"""
-    # Você é um especialista em estrutura narrativa. 
-    # Baseado nas seguintes informações, crie um sumário detalhado para um livro:
-    
-    # Tema: {state['theme']}
-    # Título sugerido: {state['title']}
-    # Gênero: {state['genre']}
-    # Público-Alvo: {state['target_audience']}
-    
-    # Inclua entre 5 e 10 capítulos com títulos e uma breve descrição para cada um.
-    # Responda SOMENTE em formato JSON com uma lista de objetos contendo "chapter_number", "chapter_title" e "chapter_description".
-    # Exemplo: [{{"chapter_number": 1, "chapter_title": "Início", "chapter_description": "Algo"}}]
-    # """
     
     prompt = f"""
-    Você é um especialista técnico elaborando um livro informativo. 
-    Baseado nas seguintes informações, crie um sumário detalhado com foco em aspectos técnicos e práticos:
+    Você é um especialista técnico elaborando um livro técnico para estudo de um determinado tema. 
+    Baseado nas seguintes informações, crie um sumário detalhado e com pelo menos 3 níveis de aprofundamento com foco em aspectos técnicos e práticos:
     
     Tema: {state['theme']}
     Título sugerido: {state['title']}
     Gênero: {state['genre']}
     Público-Alvo: {state['target_audience']}
     
-    Inclua entre 5 e 10 capítulos, cada um abordando um aspecto técnico ou prático do tema, com títulos objetivos e descrições que detalhem o conteúdo analítico a ser explorado.
+    Inclua entre 5 e 100 capítulos, cada um abordando um aspecto técnico ou prático do tema, com títulos objetivos e descrições que detalhem o conteúdo analítico a ser explorado.
     Responda SOMENTE em formato JSON com uma lista de objetos contendo "chapter_number", "chapter_title" e "chapter_description".
     Exemplo: [{{"chapter_number": 1, "chapter_title": "Princípios de Propulsão Espacial", "chapter_description": "Análise dos sistemas de propulsão usados em missões espaciais"}}]
     """
@@ -161,6 +151,7 @@ def create_outline(state: BookState, model) -> Dict[str, Any]:
         "status": "outline_created"
     }
     logger.info(f"Sumário criado com {len(outline_data)} capítulos.")
+    logger.info(f"Capítulos gerados: {updates['chapters']}")
     return updates
 
 def write_chapter(state: BookState, model) -> Dict[str, Any]:
@@ -183,19 +174,6 @@ def write_chapter(state: BookState, model) -> Dict[str, Any]:
         {prev_chapter['content'][:500]}... (resumido)
         """
     
-    # prompt = f"""
-    # Você é um escritor profissional escrevendo um livro intitulado "{state['title']}" 
-    # com o tema "{state['theme']}" no gênero "{state['genre']}" para o público "{state['target_audience']}".
-    
-    # Escreva o Capítulo {current}: "{chapter_info['title']}".
-    
-    # Descrição do capítulo: {chapter_info['description']}
-    
-    # {prev_content}
-    
-    # Seja criativo, use diálogos, descrições vívidas e mantenha o tema e a narrativa consistentes.
-    # O capítulo deve ter pelo menos 1500 palavras.
-    # """
     prompt = f"""
     Você é um especialista técnico escrevendo um livro intitulado "{state['title']}" 
     com o tema "{state['theme']}" no gênero "{state['genre']}" para o público "{state['target_audience']}".
@@ -206,7 +184,7 @@ def write_chapter(state: BookState, model) -> Dict[str, Any]:
     
     {prev_content}
     
-    Escreva um texto técnico e analítico, com linguagem formal e objetiva. Inclua informações técnicas detalhadas, exemplos contextualizados (reais ou hipotéticos), dados relevantes e explicações claras. Evite diálogos narrativos ou descrições literárias excessivas. Estruture o conteúdo com seções claras (ex.: introdução, análise, exemplos, conclusão). O capítulo deve ter pelo menos 1500 palavras.
+    Escreva um texto técnico e analítico, com linguagem formal e objetiva. Inclua informações técnicas detalhadas, exemplos contextualizados (reais ou hipotéticos), dados relevantes e explicações claras. Evite diálogos narrativos ou descrições literárias excessivas. Estruture o conteúdo com seções claras (ex.: introdução, análise, exemplos, conclusão). O capítulo deve ter pelo menos 3000 palavras. Seja o mais detalhista possível e aborde o tema do capítulo com profundidade e bastante exemplo.
     """
     
     response = model.generate_content(prompt)
@@ -239,7 +217,7 @@ def review_and_edit(state: BookState, model) -> Dict[str, Any]:
     {book_summary}
     
     Forneça feedback sobre estrutura, fluxo narrativo, consistência com o tema "{state['theme']}" 
-    e apelo ao público-alvo. Sugira melhorias.
+    e apelo ao público-alvo. Sugira melhorias. Revise tecnicamente o livro e verifique se há alguma inconsistência.
     """
     
     response = model.generate_content(prompt)
@@ -248,6 +226,20 @@ def review_and_edit(state: BookState, model) -> Dict[str, Any]:
         "status": "reviewed"
     }
     logger.info("Revisão concluída. Feedback gerado.")
+    
+    return updates
+
+def export_feedback(state: BookState) -> Dict[str, Any]:
+    """Exporta o feedback para um arquivo TXT."""
+    logger.info("Exportando feedback para TXT...")
+    feedback_path = f"{state['title'].replace(' ', '_')}_feedback.txt"
+    with open(feedback_path, "w", encoding="utf-8") as f:
+        f.write(state["feedback"])
+    updates = {
+        "feedback_path": feedback_path,
+        "status": "feedback_exported"
+    }
+    logger.info(f"Feedback exportado com sucesso para: {feedback_path}")
     return updates
 
 def export_book(state: BookState) -> Dict[str, Any]:
@@ -280,7 +272,8 @@ def router(state: BookState) -> str:
         "outline_created": "write_chapter",
         "chapter_written": "write_chapter",
         "all_chapters_written": "review_and_edit",
-        "reviewed": "export_book",
+        "reviewed": "export_feedback", # Adicionado o novo estado
+        "feedback_exported": "export_book", # Adicionado o novo estado
         "exported": END
     }
     next_state = status_map.get(state["status"], END)
@@ -297,6 +290,7 @@ def create_book_agent(model):
     workflow.add_node("create_outline", lambda state: create_outline(state, model))
     workflow.add_node("write_chapter", lambda state: write_chapter(state, model))
     workflow.add_node("review_and_edit", lambda state: review_and_edit(state, model))
+    workflow.add_node("export_feedback", export_feedback) # Adicionado o novo nó
     workflow.add_node("export_book", export_book)
     
     # Definir ponto de entrada
@@ -307,6 +301,7 @@ def create_book_agent(model):
     workflow.add_conditional_edges("create_outline", router)
     workflow.add_conditional_edges("write_chapter", router)
     workflow.add_conditional_edges("review_and_edit", router)
+    workflow.add_conditional_edges("export_feedback", router) # Adicionado o novo nó
     workflow.add_conditional_edges("export_book", router)
     
     # Configurar o checkpointer na compilação
@@ -344,6 +339,8 @@ def main(custom_theme: str = "", custom_genre: str = "", custom_audience: str = 
             print(f"Sumário criado com {len(output[node_name]['outline'])} capítulos")
         elif stage == "chapter_written":
             print(f"Capítulo {output[node_name]['current_chapter']-1} concluído")
+        elif stage == "feedback_exported":
+            print(f"Feedback exportado para: {output[node_name]['feedback_path']}")
         elif stage == "exported":
             print(f"Livro exportado para: {output[node_name]['export_path']}")
     
