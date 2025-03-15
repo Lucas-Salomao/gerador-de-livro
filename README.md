@@ -44,21 +44,11 @@ O projeto é composto por um único arquivo principal:
 2.  **Chave de Serviço:** Configure uma chave de serviço para autenticação com o Vertex AI.
 3.  **Variáveis de Ambiente:** Crie um arquivo `.env` na raiz do projeto com as seguintes variáveis:
     ```
-    PROJECT_ID=seu-projeto-id
-    LOCATION=us-central1 # ou a região de sua preferência
+    GEMINI_API_KEY=sua chave de API do Google AI Studio
     ```
 4.  **Instalação de Dependências:** Instale as dependências do projeto usando o `pip`:
     ```bash
     pip install -r requirements.txt
-    ```
-    O arquivo `requirements.txt` deve conter:
-    ```
-    python-dotenv
-    langgraph
-    google-cloud-aiplatform
-    vertexai
-    python-docx
-    langchain
     ```
 
 ### Execução
