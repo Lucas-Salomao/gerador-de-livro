@@ -15,6 +15,8 @@ from google.cloud import aiplatform
 from vertexai.generative_models import GenerativeModel, Part
 import vertexai
 
+import google.generativeai as genai
+
 # Biblioteca para exportação
 from docx import Document
 
@@ -32,11 +34,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Inicializar Vertex AI
-def init_vertex_ai(project_id: str, location: str = "us-central1"):
-    """Inicializa a conexão com o Vertex AI."""
-    logger.info("Inicializando Vertex AI...")
-    vertexai.init(project=os.getenv("PROJECT_ID"), location=os.getenv("LOCATION"))
-    return GenerativeModel("gemini-2.0-flash-001")
+# def init_vertex_ai(project_id: str, location: str = "us-central1"):
+#     """Inicializa a conexão com o Vertex AI."""
+#     logger.info("Inicializando Vertex AI...")
+#     vertexai.init(project=os.getenv("PROJECT_ID"), location=os.getenv("LOCATION"))
+#     return GenerativeModel("gemini-2.0-flash-001")
+
+# Inicializar Gemini API
+def init_gemini_api(api_key: str):
+    """Inicializa a conexão com o Gemini API."""
+    logger.info("Inicializando Gemini API...")
+    genai.configure(api_key=api_key)
+    return genai.GenerativeModel('gemini-2.0-flash')
 
 # Função auxiliar para parsing seguro de JSON
 def safe_json_parse(response_text: str, fallback: Any) -> Any:
@@ -119,7 +128,7 @@ def create_outline(state: BookState, model) -> Dict[str, Any]:
     Gênero: {state['genre']}
     Público-Alvo: {state['target_audience']}
     
-    Inclua entre 5 e 100 capítulos, cada um abordando um aspecto técnico ou prático do tema, com títulos objetivos e descrições que detalhem o conteúdo analítico a ser explorado.
+    Inclua entre 5 e 20 capítulos, cada um abordando um aspecto técnico ou prático do tema, com títulos objetivos e descrições que detalhem o conteúdo analítico a ser explorado.
     Responda SOMENTE em formato JSON com uma lista de objetos contendo "chapter_number", "chapter_title" e "chapter_description".
     Exemplo: [{{"chapter_number": 1, "chapter_title": "Princípios de Propulsão Espacial", "chapter_description": "Análise dos sistemas de propulsão usados em missões espaciais"}}]
     Não inclua bloco de código, ou seja ```json```
@@ -312,7 +321,8 @@ def create_book_agent(model):
 def main(custom_theme: str = "", custom_genre: str = "", custom_audience: str = ""):
     """Executa o agente de geração de livros."""
     logger.info("Iniciando processo de geração de livro...")
-    model = init_vertex_ai(os.getenv("PROJECT_ID"))
+    # model = init_vertex_ai(os.getenv("PROJECT_ID"))
+    model = init_gemini_api(os.getenv("GEMINI_API_KEY"))
     book_agent = create_book_agent(model)
     
     initial_state = BookState(status="start")
