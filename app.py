@@ -11,9 +11,9 @@ from langgraph.checkpoint.memory import MemorySaver
 import langchain
 
 # Bibliotecas para Gemini/Vertex AI
-from google.cloud import aiplatform
-from vertexai.generative_models import GenerativeModel, Part
-import vertexai
+# from google.cloud import aiplatform
+# from vertexai.generative_models import GenerativeModel, Part
+# import vertexai
 
 import google.generativeai as genai
 
@@ -22,7 +22,7 @@ from docx import Document
 
 load_dotenv()
 
-# Configuração de logs
+# # Configuração de logs
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -93,7 +93,7 @@ def get_book_info(state: BookState, model) -> Dict[str, Any]:
     Gênero: {genre}
     Público-Alvo: {target_audience}
     Responda SOMENTE em formato JSON com a chave "title", sem texto adicional. Exemplo: {{"title": "Fundamentos de Exploração Espacial"}}. Não inclua bloco de código, ou seja ```json```
-    O Título deve ter no máximo 80 caracteres. Caracteres inválidos para o título: \ / : * ? " < > |
+    O Título deve ter no máximo 80 caracteres. Caracteres inválidos para o título: , \ / : * ? " < > |
     """
     
     logger.info("Gerando título com base no tema...")
