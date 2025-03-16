@@ -21,3 +21,4 @@ python-docx==1.1.2
 fpdf2==2.8.2
 langgraph-checkpoint==2.0.18
 fpdf==1.7.2
+streamlit==1.43.2
