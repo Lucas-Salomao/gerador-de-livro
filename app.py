@@ -24,7 +24,7 @@ load_dotenv()
 
 # Configuração de logs
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
         logging.FileHandler("book_generation.log"),
@@ -32,13 +32,6 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
-
-# Inicializar Vertex AI
-# def init_vertex_ai(project_id: str, location: str = "us-central1"):
-#     """Inicializa a conexão com o Vertex AI."""
-#     logger.info("Inicializando Vertex AI...")
-#     vertexai.init(project=os.getenv("PROJECT_ID"), location=os.getenv("LOCATION"))
-#     return GenerativeModel("gemini-2.0-flash-001")
 
 # Inicializar Gemini API
 def init_gemini_api(api_key: str):
@@ -50,7 +43,6 @@ def init_gemini_api(api_key: str):
 # Função auxiliar para parsing seguro de JSON
 def safe_json_parse(response_text: str, fallback: Any) -> Any:
     """Tenta decodificar JSON e retorna um fallback em caso de erro."""
-    # Remove code block markers if present
     if response_text.startswith("```json"):
         response_text = response_text[7:]
         if response_text.endswith("```"):
@@ -87,7 +79,6 @@ def get_book_info(state: BookState, model) -> Dict[str, Any]:
     logger.info("Coletando informações básicas do livro...")
     updates = {}
     
-    # Garantir valores padrão se não fornecidos
     theme = state.get("theme", "Um tema genérico")
     genre = state.get("genre", "Ficção")
     target_audience = state.get("target_audience", "Adultos")
@@ -102,6 +93,7 @@ def get_book_info(state: BookState, model) -> Dict[str, Any]:
     Gênero: {genre}
     Público-Alvo: {target_audience}
     Responda SOMENTE em formato JSON com a chave "title", sem texto adicional. Exemplo: {{"title": "Fundamentos de Exploração Espacial"}}. Não inclua bloco de código, ou seja ```json```
+    O Título deve ter no máximo 80 caracteres. Caracteres inválidos para o título: \ / : * ? " < > |
     """
     
     logger.info("Gerando título com base no tema...")
@@ -128,7 +120,7 @@ def create_outline(state: BookState, model) -> Dict[str, Any]:
     Gênero: {state['genre']}
     Público-Alvo: {state['target_audience']}
     
-    Inclua entre 5 e 20 capítulos, cada um abordando um aspecto técnico ou prático do tema, com títulos objetivos e descrições que detalhem o conteúdo analítico a ser explorado.
+    Inclua entre 5 a 20 capítulos, cada um abordando um aspecto técnico ou prático do tema, com títulos objetivos e descrições que detalhem o conteúdo analítico a ser explorado.
     Responda SOMENTE em formato JSON com uma lista de objetos contendo "chapter_number", "chapter_title" e "chapter_description".
     Exemplo: [{{"chapter_number": 1, "chapter_title": "Princípios de Propulsão Espacial", "chapter_description": "Análise dos sistemas de propulsão usados em missões espaciais"}}]
     Não inclua bloco de código, ou seja ```json```
@@ -141,7 +133,6 @@ def create_outline(state: BookState, model) -> Dict[str, Any]:
          "chapter_description": f"Exploração inicial do tema {state['theme']}."}
     ])
     
-    # Garantir pelo menos 5 capítulos
     if len(outline_data) < 5:
         logger.warning("Sumário com menos de 5 capítulos. Adicionando capítulos extras.")
         for i in range(len(outline_data) + 1, 6):
@@ -164,7 +155,7 @@ def create_outline(state: BookState, model) -> Dict[str, Any]:
     logger.info(f"Capítulos gerados: {updates['chapters']}")
     return updates
 
-def write_chapter(state: BookState, model) -> Dict[str, Any]:
+def write_chapter(state: BookState, model, st_session=None) -> Dict[str, Any]:
     """Escreve o conteúdo para o capítulo atual."""
     current = state["current_chapter"]
     updates = {}
@@ -175,6 +166,12 @@ def write_chapter(state: BookState, model) -> Dict[str, Any]:
     
     chapter_info = state["chapters"][current]
     logger.info(f"Escrevendo Capítulo {current}: {chapter_info['title']}...")
+    
+    # Notificar o Streamlit sobre o progresso
+    if st_session:
+        st_session.write(f"Gerando Capítulo {current}: {chapter_info['title']}")
+        progress = int((current / len(state["chapters"])) * 100)
+        st_session.progress(progress)
     
     prev_content = ""
     if current > 1 and state["chapters"].get(current-1, {}).get("content"):
@@ -202,6 +199,11 @@ def write_chapter(state: BookState, model) -> Dict[str, Any]:
     updated_chapters[current]["content"] = response.text
     updates["chapters"] = updated_chapters
     logger.info(f"Capítulo {current} concluído com sucesso.")
+    
+    # Exibir o conteúdo gerado no Streamlit
+    if st_session:
+        # st_session.write(f"### Capítulo {current}: {chapter_info['title']}")
+        st_session.write(response.text)
     
     updates["current_chapter"] = current + 1
     updates["status"] = "chapter_written" if updates["current_chapter"] <= len(state["chapters"]) else "all_chapters_written"
@@ -282,93 +284,84 @@ def router(state: BookState) -> str:
         "outline_created": "write_chapter",
         "chapter_written": "write_chapter",
         "all_chapters_written": "review_and_edit",
-        "reviewed": "export_feedback", # Adicionado o novo estado
-        "feedback_exported": "export_book", # Adicionado o novo estado
+        "reviewed": "export_feedback",
+        "feedback_exported": "export_book",
         "exported": END
     }
     next_state = status_map.get(state["status"], END)
     logger.debug(f"Transição de estado: {state['status']} -> {next_state}")
     return next_state
 
-def create_book_agent(model):
+def create_book_agent(model, st_session=None):
     """Cria o agente de geração de livros."""
     logger.info("Criando agente de geração de livros...")
     workflow = StateGraph(BookState)
     
-    # Adicionar nós com passagem de modelo
     workflow.add_node("get_book_info", lambda state: get_book_info(state, model))
     workflow.add_node("create_outline", lambda state: create_outline(state, model))
-    workflow.add_node("write_chapter", lambda state: write_chapter(state, model))
+    workflow.add_node("write_chapter", lambda state: write_chapter(state, model, st_session))
     workflow.add_node("review_and_edit", lambda state: review_and_edit(state, model))
-    workflow.add_node("export_feedback", export_feedback) # Adicionado o novo nó
+    workflow.add_node("export_feedback", export_feedback)
     workflow.add_node("export_book", export_book)
     
-    # Definir ponto de entrada
     workflow.set_entry_point("get_book_info")
     
-    # Adicionar arestas condicionais
     workflow.add_conditional_edges("get_book_info", router)
     workflow.add_conditional_edges("create_outline", router)
     workflow.add_conditional_edges("write_chapter", router)
     workflow.add_conditional_edges("review_and_edit", router)
-    workflow.add_conditional_edges("export_feedback", router) # Adicionado o novo nó
+    workflow.add_conditional_edges("export_feedback", router)
     workflow.add_conditional_edges("export_book", router)
     
-    # Configurar o checkpointer na compilação
     memory = MemorySaver()
     return workflow.compile(checkpointer=memory)
 
-def main(custom_theme: str = "", custom_genre: str = "", custom_audience: str = ""):
+def main(custom_theme: str = "", custom_genre: str = "", custom_audience: str = "", st_session=None):
     """Executa o agente de geração de livros."""
     logger.info("Iniciando processo de geração de livro...")
-    # model = init_vertex_ai(os.getenv("PROJECT_ID"))
-    model = init_gemini_api(os.getenv("GEMINI_API_KEY"))
-    book_agent = create_book_agent(model)
-    
-    initial_state = BookState(status="start")
-    if custom_theme:
-        initial_state["theme"] = custom_theme
-    if custom_genre:
-        initial_state["genre"] = custom_genre
-    if custom_audience:
-        initial_state["target_audience"] = custom_audience
-    
-    # Configuração para usar o checkpointer com thread_id
-    config = {"configurable": {"thread_id": "1"}}
-    
-    for output in book_agent.stream(initial_state, config=config):
-        # Capturar o estado da chave correspondente ao nó atual
-        node_name = list(output.keys())[0] if output else "unknown"
-        stage = output.get(node_name, {}).get("status", "desconhecido")
-        print(f"Concluído: {stage}")
-        if stage == "book_info_collected":
-            print(f"Tema: {output[node_name]['theme']}")
-            print(f"Título gerado: {output[node_name]['title']}")
-            print(f"Gênero: {output[node_name]['genre']}")
-            print(f"Público-alvo: {output[node_name]['target_audience']}")
-        elif stage == "outline_created":
-            print(f"Sumário criado com {len(output[node_name]['outline'])} capítulos")
-        elif stage == "chapter_written":
-            print(f"Capítulo {output[node_name]['current_chapter']-1} concluído")
-        elif stage == "feedback_exported":
-            print(f"Feedback exportado para: {output[node_name]['feedback_path']}")
-        elif stage == "exported":
-            print(f"Livro exportado para: {output[node_name]['export_path']}")
-    
-    # Recuperar o estado final usando o mesmo config
-    final_state = book_agent.checkpointer.get(config)
-    logger.info("Processo de geração de livro concluído!")
-    return final_state
-
-if __name__ == "__main__":
-    import argparse
-    
-    parser = argparse.ArgumentParser(description="Agente de geração de livros usando Gemini e LangGraph")
-    parser.add_argument("--theme", default="", help="Tema do livro (opcional)")
-    parser.add_argument("--genre", default="", help="Gênero do livro (opcional)")
-    parser.add_argument("--audience", default="", help="Público-alvo do livro (opcional)")
-    
-    args = parser.parse_args()
-    
-    result = main(args.theme, args.genre, args.audience)
-    print("Processo de geração de livro concluído!")
+    try:
+        model = init_gemini_api(os.getenv("GEMINI_API_KEY"))
+        book_agent = create_book_agent(model, st_session)
+        
+        initial_state = BookState(status="start")
+        if custom_theme:
+            initial_state["theme"] = custom_theme
+        if custom_genre:
+            initial_state["genre"] = custom_genre
+        if custom_audience:
+            initial_state["target_audience"] = custom_audience
+        
+        config = {"configurable": {"thread_id": "1"}}
+        
+        for output in book_agent.stream(initial_state, config=config):
+            node_name = list(output.keys())[0] if output else "unknown"
+            stage = output.get(node_name, {}).get("status", "desconhecido")
+            if st_session:
+                st_session.write(f"Concluído: {stage}")
+            if stage == "book_info_collected":
+                if st_session:
+                    st_session.write(f"**Tema:** {output[node_name]['theme']}")
+                    st_session.write(f"**Título gerado:** {output[node_name]['title']}")
+                    st_session.write(f"**Gênero:** {output[node_name]['genre']}")
+                    st_session.write(f"**Público-alvo:** {output[node_name]['target_audience']}")
+            elif stage == "outline_created":
+                if st_session:
+                    st_session.write(f"Sumário criado com {len(output[node_name]['outline'])} capítulos")
+            elif stage == "chapter_written":
+                if st_session:
+                    st_session.write(f"Capítulo {output[node_name]['current_chapter']-1} concluído")
+            elif stage == "feedback_exported":
+                if st_session:
+                    st_session.write(f"Feedback exportado para: {output[node_name]['feedback_path']}")
+            elif stage == "exported":
+                if st_session:
+                    st_session.write(f"Livro exportado para: {output[node_name]['export_path']}")
+        
+        final_state = book_agent.checkpointer.get(config)
+        logger.info("Processo de geração de livro concluído!")
+        return final_state
+    except Exception as e:
+        logger.error(f"Erro durante a geração do livro: {e}")
+        if st_session:
+            st_session.error(f"Erro durante a geração do livro: {e}")
+        return {"status": "error", "message": str(e)}
