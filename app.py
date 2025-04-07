@@ -19,6 +19,11 @@ import google.generativeai as genai
 
 # Biblioteca para exportação
 from docx import Document
+from docx.shared import Pt, Inches, RGBColor
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+import re
 
 load_dotenv()
 
@@ -120,7 +125,7 @@ def create_outline(state: BookState, model) -> Dict[str, Any]:
     Gênero: {state['genre']}
     Público-Alvo: {state['target_audience']}
     
-    Inclua entre 5 a 20 capítulos, cada um abordando um aspecto técnico ou prático do tema, com títulos objetivos e descrições que detalhem o conteúdo analítico a ser explorado.
+    Inclua entre 5 a 50 capítulos, cada um abordando um aspecto técnico ou prático do tema, com títulos objetivos e descrições que detalhem o conteúdo analítico a ser explorado.
     Responda SOMENTE em formato JSON com uma lista de objetos contendo "chapter_number", "chapter_title" e "chapter_description".
     Exemplo: [{{"chapter_number": 1, "chapter_title": "Princípios de Propulsão Espacial", "chapter_description": "Análise dos sistemas de propulsão usados em missões espaciais"}}]
     Não inclua bloco de código, ou seja ```json```
@@ -254,27 +259,272 @@ def export_feedback(state: BookState) -> Dict[str, Any]:
     logger.info(f"Feedback exportado com sucesso para: {feedback_path}")
     return updates
 
+# def export_book(state: BookState) -> Dict[str, Any]:
+#     """Exporta o livro apenas para DOCX."""
+#     logger.info("Exportando livro para DOCX...")
+#     doc = Document()
+#     doc.add_heading(state["title"], 0)
+#     doc.add_paragraph(f"Tema: {state['theme']}")
+#     doc.add_paragraph(f"Gênero: {state['genre']}")
+#     doc.add_paragraph(f"Público-alvo: {state['target_audience']}")
+    
+#     for chapter_num, chapter_data in sorted(state["chapters"].items()):
+#         doc.add_heading(f"Capítulo {chapter_num}: {chapter_data['title']}", 1)
+#         doc.add_paragraph(chapter_data["content"])
+    
+#     doc_path = f"{state['title'].replace(' ', '_')}.docx"
+#     doc.save(doc_path)
+#     updates = {
+#         "export_path": doc_path,
+#         "status": "exported"
+#     }
+#     logger.info(f"Livro exportado com sucesso para: {doc_path}")
+#     return updates
+
+
 def export_book(state: BookState) -> Dict[str, Any]:
-    """Exporta o livro apenas para DOCX."""
-    logger.info("Exportando livro para DOCX...")
+    """Exporta o livro para DOCX com formatação completa e suporte total a Markdown."""
+    logger.info("Exportando livro para DOCX com formatação completa...")
     doc = Document()
-    doc.add_heading(state["title"], 0)
-    doc.add_paragraph(f"Tema: {state['theme']}")
-    doc.add_paragraph(f"Gênero: {state['genre']}")
-    doc.add_paragraph(f"Público-alvo: {state['target_audience']}")
-    
+
+    # Configuração de estilos
+    styles = doc.styles
+    for style in styles:
+        if hasattr(style, 'font') and style.font:
+            style.font.name = 'Arial'
+
+    title_style = styles['Title']
+    title_style.font.name = 'Arial'
+    title_style.font.size = Pt(24)
+    title_style.font.bold = True
+    title_style.font.color.rgb = RGBColor(0, 0, 0)
+
+    heading_styles = {
+        1: styles['Heading 1'], 2: styles['Heading 2'], 3: styles['Heading 3'],
+        4: styles['Heading 4'], 5: styles['Heading 5'], 6: styles['Heading 6']
+    }
+    for level, style in heading_styles.items():
+        style.font.name = 'Arial'
+        style.font.size = Pt(16 - level * 2)  # Diminui o tamanho conforme o nível
+        style.font.bold = True
+        style.font.color.rgb = RGBColor(0, 51, 102)
+
+    normal_style = styles['Normal']
+    normal_style.font.name = 'Arial'
+    normal_style.font.size = Pt(12)
+    normal_style.paragraph_format.line_spacing = 1.15
+    normal_style.paragraph_format.space_after = Pt(10)
+
+    # Configurar margens e rodapé
+    sections = doc.sections
+    for section in sections:
+        section.top_margin = Inches(1)
+        section.bottom_margin = Inches(1)
+        section.left_margin = Inches(1)
+        section.right_margin = Inches(1)
+
+        footer = section.footer
+        footer_paragraph = footer.paragraphs[0]
+        footer_paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+        footer_run = footer_paragraph.add_run()
+        footer_run.font.name = 'Arial'
+        footer_run.font.size = Pt(10)
+
+        def add_field(run, field_code):
+            field = OxmlElement('w:fldChar')
+            field.set(qn('w:fldCharType'), 'begin')
+            run._element.append(field)
+            instr = OxmlElement('w:instrText')
+            instr.set(qn('xml:space'), 'preserve')
+            instr.text = field_code
+            run._element.append(instr)
+            sep = OxmlElement('w:fldChar')
+            sep.set(qn('w:fldCharType'), 'separate')
+            run._element.append(sep)
+            end = OxmlElement('w:fldChar')
+            end.set(qn('w:fldCharType'), 'end')
+            run._element.append(end)
+
+        footer_run.add_text('Página ')
+        add_field(footer_run, 'PAGE')
+        footer_run.add_text(' de ')
+        add_field(footer_run, 'NUMPAGES')
+
+    # Adicionar título
+    title_paragraph = doc.add_paragraph(state["title"], style='Title')
+    title_paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+
+    # Informações iniciais
+    info_paragraph = doc.add_paragraph()
+    info_paragraph.add_run("Tema: ").bold = True
+    info_paragraph.add_run(state["theme"])
+    info_paragraph.add_run("\nGênero: ").bold = True
+    info_paragraph.add_run(state["genre"])
+    info_paragraph.add_run("\nPúblico-alvo: ").bold = True
+    info_paragraph.add_run(state["target_audience"])
+    doc.add_page_break()
+
+    # Adicionar sumário
+    doc.add_heading("Sumário", level=1)
+    toc_paragraph = doc.add_paragraph()
+    toc_run = toc_paragraph.add_run()
+    toc_field = OxmlElement('w:fldChar')
+    toc_field.set(qn('w:fldCharType'), 'begin')
+    toc_run._element.append(toc_field)
+    toc_instr = OxmlElement('w:instrText')
+    toc_instr.set(qn('xml:space'), 'preserve')
+    toc_instr.text = 'TOC \\o "1-3" \\h \\z \\u'  # Níveis 1 a 3
+    toc_run._element.append(toc_instr)
+    toc_sep = OxmlElement('w:fldChar')
+    toc_sep.set(qn('w:fldCharType'), 'separate')
+    toc_run._element.append(toc_sep)
+    toc_end = OxmlElement('w:fldChar')
+    toc_end.set(qn('w:fldCharType'), 'end')
+    toc_run._element.append(toc_end)
+    doc.add_paragraph("Clique com o botão direito e escolha 'Atualizar campo' para gerar o sumário.", style='Caption')
+    doc.add_page_break()
+
+    # Parser Markdown completo
+    def process_markdown(text, doc):
+        lines = text.split('\n')
+        in_code_block = False
+        code_lines = []
+        in_table = False
+        table_rows = []
+
+        for i, line in enumerate(lines):
+            line = line.rstrip()
+            if not line and not in_code_block and not in_table:
+                continue
+
+            # Blocos de código
+            if line.strip() == '```':
+                if not in_code_block:
+                    in_code_block = True
+                    code_lines = []
+                else:
+                    in_code_block = False
+                    code_paragraph = doc.add_paragraph()
+                    code_paragraph.paragraph_format.left_indent = Inches(0.5)
+                    code_paragraph.paragraph_format.right_indent = Inches(0.5)
+                    run = code_paragraph.add_run('\n'.join(code_lines))
+                    run.font.name = 'Courier New'
+                    run.font.size = Pt(10)
+                    run.font.color.rgb = RGBColor(50, 50, 50)
+                continue
+            if in_code_block:
+                code_lines.append(line)
+                continue
+
+            # Títulos
+            if line.startswith('#'):
+                level = min(line.count('#', 0, 6), 6)
+                title_text = line.lstrip('#').strip()
+                doc.add_heading(title_text, level=min(level, 6))
+                continue
+
+            # Linha horizontal
+            if re.match(r'^\s*[-*_]{3,}\s*$', line):
+                doc.add_paragraph().add_run().add_break(docx.enum.text.WD_BREAK.LINE)
+                continue
+
+            # Citações
+            if line.startswith('>'):
+                quote_paragraph = doc.add_paragraph()
+                quote_paragraph.paragraph_format.left_indent = Inches(0.5)
+                apply_inline_formatting(line.lstrip('>').strip(), quote_paragraph)
+                continue
+
+            # Listas ordenadas e não ordenadas
+            if re.match(r'^\s*(\d+\.|-|\*|\+)\s+', line):
+                indent_level = len(re.match(r'^\s*', line).group()) // 2
+                list_item = re.sub(r'^\s*(\d+\.|-|\*|\+)\s+', '', line).strip()
+                style = 'List Number' if re.match(r'^\s*\d+\.\s+', line) else 'List Bullet'
+                paragraph = doc.add_paragraph(style=style)
+                paragraph.paragraph_format.left_indent = Inches(0.25 * (indent_level + 1))
+                apply_inline_formatting(list_item, paragraph)
+                continue
+
+            # Tabelas
+            if line.startswith('|') and '|' in line[1:]:
+                if not in_table:
+                    in_table = True
+                    table_rows = []
+                row = [cell.strip() for cell in line.split('|')[1:-1]]
+                if row and not re.match(r'^\s*-+\s*$', row[0]):  # Ignora linha de separação
+                    table_rows.append(row)
+                elif table_rows:  # Fim da tabela após separador
+                    in_table = False
+                    table = doc.add_table(rows=len(table_rows), cols=len(table_rows[0]))
+                    table.style = 'Table Grid'
+                    for r_idx, row in enumerate(table_rows):
+                        for c_idx, cell_text in enumerate(row):
+                            cell = table.rows[r_idx].cells[c_idx]
+                            apply_inline_formatting(cell_text, cell.paragraphs[0])
+                continue
+
+            # Parágrafo simples
+            paragraph = doc.add_paragraph()
+            apply_inline_formatting(line, paragraph)
+
+    # Função para aplicar formatação inline
+    def apply_inline_formatting(text, paragraph):
+        # Regex para capturar negrito, itálico, tachado e links
+        pattern = r'(\*\*\*.*?\*\*\*|\*\*.*?\*\*|\*.*?\*|~~.*?~~|$$ .*? $$$$ .*? $$|_.*?_)'
+        parts = re.split(pattern, text)
+        
+        for part in parts:
+            if not part:
+                continue
+            run = paragraph.add_run()
+            if part.startswith('***') and part.endswith('***'):
+                run.text = part[3:-3]
+                run.bold = True
+                run.italic = True
+            elif part.startswith('**') and part.endswith('**'):
+                run.text = part[2:-2]
+                run.bold = True
+            elif part.startswith('*') and part.endswith('*'):
+                run.text = part[1:-1]
+                run.italic = True
+            elif part.startswith('_') and part.endswith('_'):
+                run.text = part[1:-1]
+                run.italic = True
+            elif part.startswith('~~') and part.endswith('~~'):
+                run.text = part[2:-2]
+                run.font.strike = True
+            elif part.startswith('[') and ']' in part and '(' in part and part.endswith(')'):
+                link_text = part[1:part.index(']')]
+                link_url = part[part.index('(')+1:-1]
+                run.text = link_text
+                run.font.underline = True
+                run.font.color.rgb = RGBColor(0, 0, 255)
+                # python-docx não suporta hiperlinks diretamente; URL é apenas visual
+            else:
+                run.text = part
+
+    # Adicionar capítulos
     for chapter_num, chapter_data in sorted(state["chapters"].items()):
-        doc.add_heading(f"Capítulo {chapter_num}: {chapter_data['title']}", 1)
-        doc.add_paragraph(chapter_data["content"])
-    
+        doc.add_heading(f"Capítulo {chapter_num}: {chapter_data['title']}", level=1)
+        process_markdown(chapter_data["content"], doc)
+        if chapter_num < len(state["chapters"]):
+            doc.add_page_break()
+
+    if state.get("feedback"):
+        doc.add_page_break()
+        doc.add_heading("Feedback da Revisão", level=1)
+        process_markdown(state["feedback"], doc)
+
     doc_path = f"{state['title'].replace(' ', '_')}.docx"
     doc.save(doc_path)
+
     updates = {
         "export_path": doc_path,
         "status": "exported"
     }
     logger.info(f"Livro exportado com sucesso para: {doc_path}")
     return updates
+
 
 def router(state: BookState) -> str:
     """Decide o próximo estado."""
@@ -331,7 +581,7 @@ def main(custom_theme: str = "", custom_genre: str = "", custom_audience: str = 
         if custom_audience:
             initial_state["target_audience"] = custom_audience
         
-        config = {"configurable": {"thread_id": "1"}}
+        config = {"configurable": {"thread_id": "1"},"recursion_limit": 100}
         
         for output in book_agent.stream(initial_state, config=config):
             node_name = list(output.keys())[0] if output else "unknown"
