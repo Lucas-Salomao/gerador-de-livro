@@ -76,19 +76,19 @@ graph TD
     subgraph "Interface do Usuário (Streamlit)"
         A[Usuário] --> B(Interface Web);
         B --> C{Preencher Formulário};
-        C -- Clicar em "Gerar Livro" --> D[Iniciar Agente];
+        C -- "Clicar em Gerar Livro" --> D[Iniciar Agente];
     end
 
     subgraph "Backend (Agent.py com LangGraph)"
         D --> E{get_book_info};
-        E -- Título Gerado --> F{create_outline};
-        F -- Sumário Criado --> G{write_chapter Loop};
-        G -- Capítulo Escrito --> H{Todos os capítulos escritos?};
+        E -- "Título Gerado" --> F{create_outline};
+        F -- "Sumário Criado" --> G{write_chapter Loop};
+        G -- "Capítulo Escrito" --> H{Todos os capítulos escritos?};
         H -- Sim --> I{review_and_edit};
         H -- Não --> G;
-        I -- Revisão Completa --> J{export_feedback};
-        J -- Feedback Exportado --> K{export_book};
-        K -- Livro Exportado --> L[Fim];
+        I -- "Revisão Completa" --> J{export_feedback};
+        J -- "Feedback Exportado" --> K{export_book};
+        K -- "Livro Exportado" --> L[Fim];
     end
 
     subgraph "Serviços Externos e Saídas"
@@ -107,8 +107,8 @@ graph TD
         L --> Q[Disponibilizar Botão de Download];
     end
 
-    B -- Interage com --> P;
-    B -- Interage com --> Q;
+    B -- "Interage com" --> P;
+    B -- "Interage com" --> Q;
 ```
 
 ### Melhorias Futuras
