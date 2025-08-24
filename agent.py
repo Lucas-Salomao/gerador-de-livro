@@ -3,7 +3,9 @@ from typing import Dict, List, Tuple, Any, TypedDict, Optional
 import json
 from pathlib import Path
 import logging
+import re
 from dotenv import load_dotenv
+import time
 
 # Bibliotecas para LangGraph
 from langgraph.graph import StateGraph, END
@@ -11,19 +13,19 @@ from langgraph.checkpoint.memory import MemorySaver
 import langchain
 
 # Bibliotecas para Gemini/Vertex AI
-# from google.cloud import aiplatform
-# from vertexai.generative_models import GenerativeModel, Part
-# import vertexai
+from google.cloud import aiplatform
+from vertexai.generative_models import GenerativeModel, Part
+import vertexai
 
-import google.generativeai as genai
+# import google.generativeai as genai
 
 # Biblioteca para exportação
+import docx
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-import re
 
 load_dotenv()
 
@@ -39,11 +41,25 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Inicializar Gemini API
-def init_gemini_api(api_key: str):
-    """Inicializa a conexão com o Gemini API."""
-    logger.info("Inicializando Gemini API...")
-    genai.configure(api_key=api_key)
-    return genai.GenerativeModel('gemini-2.0-flash')
+# def init_gemin_api(api_key: str):
+#     """Inicializa a conexão com o Gemini API."""
+#     logger.info("Inicializando Gemini API...")
+#     genai.configure(api_key=api_key)
+#     return genai.GenerativeModel('gemini-2.0-flash')
+
+def init_vertex_ai():
+    """Inicializa a conexão com o Vertex AI usando credenciais do ambiente."""
+    logger.info("Inicializando Vertex AI...")
+    project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
+    if not project_id:
+        raise ValueError("A variável de ambiente GOOGLE_CLOUD_PROJECT não foi definida.")
+    
+    vertexai.init(project=project_id)
+    
+    # IMPORTANTE: O nome do modelo no Vertex AI pode ser um pouco diferente.
+    # Verifique na documentação do Vertex AI o identificador correto para o modelo que deseja.
+    # "gemini-1.5-flash-001" é um exemplo comum e robusto.
+    return GenerativeModel("gemini-2.0-flash")
 
 # Função auxiliar para parsing seguro de JSON
 def safe_json_parse(response_text: str, fallback: Any) -> Any:
@@ -68,7 +84,9 @@ class BookState(TypedDict, total=False):
     theme: str
     title: str
     genre: str
+    main_category: str
     target_audience: str
+    num_chapters: int
     outline: List[Dict[str, Any]]
     chapters: Dict[int, Dict[str, str]]
     current_chapter: int
@@ -95,14 +113,15 @@ def get_book_info(state: BookState, model) -> Dict[str, Any]:
     prompt = f"""
     Você é um especialista em redação técnica. Baseado no seguinte tema, gênero e público-alvo, sugira um título formal e técnico que reflita um enfoque analítico e informativo:
     Tema: {theme}
-    Gênero: {genre}
+    Categoria Principal: {state.get('main_category', 'Não especificada')}
+    Gênero Específico: {genre}
     Público-Alvo: {target_audience}
     Responda SOMENTE em formato JSON com a chave "title", sem texto adicional. Exemplo: {{"title": "Fundamentos de Exploração Espacial"}}. Não inclua bloco de código, ou seja ```json```
     O Título deve ter no máximo 80 caracteres. Caracteres inválidos para o título: , \ / : * ? " < > |
     """
     
     logger.info("Gerando título com base no tema...")
-    response = model.generate_content(prompt)
+    response = generate_with_retry(model, prompt)
     logger.debug(f"Resposta bruta do modelo: {response.text}")
     info = safe_json_parse(response.text, {"title": f"Livro sobre {theme}"})
     updates["title"] = info.get("title", f"Livro sobre {theme}")
@@ -118,20 +137,27 @@ def create_outline(state: BookState, model) -> Dict[str, Any]:
     
     prompt = f"""
     Você é um especialista técnico elaborando um livro técnico para estudo de um determinado tema. 
-    Baseado nas seguintes informações, crie um sumário detalhado e com pelo menos 3 níveis de aprofundamento com foco em aspectos técnicos e práticos:
+    Baseado nas seguintes informações, crie um sumário detalhado e com foco em aspectos técnicos e práticos:
     
     Tema: {state['theme']}
     Título sugerido: {state['title']}
-    Gênero: {state['genre']}
+    Categoria Principal: {state.get('main_category', 'Não especificada')}
+    Gênero Específico: {state['genre']}
     Público-Alvo: {state['target_audience']}
     
-    Inclua entre 5 a 50 capítulos, cada um abordando um aspecto técnico ou prático do tema, com títulos objetivos e descrições que detalhem o conteúdo analítico a ser explorado.
+    Cada capítulo deve ter uma numeração inteira e sequencial (exemplo: 1, 2, 3, 4, 5, etc.)
+
+    O sumário deve conter exatamente {state['num_chapters']} capítulos, cada um abordando um aspecto técnico ou prático do tema, com títulos objetivos e descrições que detalhem o conteúdo analítico a ser explorado.
     Responda SOMENTE em formato JSON com uma lista de objetos contendo "chapter_number", "chapter_title" e "chapter_description".
     Exemplo: [{{"chapter_number": 1, "chapter_title": "Princípios de Propulsão Espacial", "chapter_description": "Análise dos sistemas de propulsão usados em missões espaciais"}}]
     Não inclua bloco de código, ou seja ```json```
     """
-    
-    response = model.generate_content(prompt)
+
+    response = generate_with_retry(model, prompt)
+    if not response:
+        logger.error("Falha ao gerar sumário.")
+        return {"status": "error", "message": "Falha ao gerar sumário."}
+
     logger.debug(f"Resposta bruta do modelo: {response.text}")
     outline_data = safe_json_parse(response.text, [
         {"chapter_number": 1, "chapter_title": "Introdução", 
@@ -187,8 +213,8 @@ def write_chapter(state: BookState, model, st_session=None) -> Dict[str, Any]:
         """
     
     prompt = f"""
-    Você é um especialista técnico escrevendo um livro intitulado "{state['title']}" 
-    com o tema "{state['theme']}" no gênero "{state['genre']}" para o público "{state['target_audience']}".
+    Você é um especialista técnico escrevendo um livro intitulado "{state['title']}" com o tema "{state['theme']}".
+    A categoria principal do livro é "{state.get('main_category', 'Não especificada')}" e o gênero específico é "{state['genre']}", direcionado para o público "{state['target_audience']}"
     
     Escreva o Capítulo {current}: "{chapter_info['title']}".
     
@@ -197,9 +223,15 @@ def write_chapter(state: BookState, model, st_session=None) -> Dict[str, Any]:
     {prev_content}
     
     Escreva um texto técnico e analítico, com linguagem formal e objetiva. Inclua informações técnicas detalhadas, exemplos contextualizados (reais ou hipotéticos), dados relevantes e explicações claras. Evite diálogos narrativos ou descrições literárias excessivas. Estruture o conteúdo com seções claras (ex.: introdução, análise, exemplos, conclusão). O capítulo deve ter pelo menos 3000 palavras. Seja o mais detalhista possível e aborde o tema do capítulo com profundidade e bastante exemplo.
+    Estruture o capítulo com títulos e subtítulos para facilitar a leitura e compreensão do conteúdo. Siga a numeração do capítulo e estruture os subtítulos com base na numeração do capítulo.
     """
-    
-    response = model.generate_content(prompt)
+
+    response = generate_with_retry(model, prompt)
+
+    if not response:
+        logger.error("Falha ao gerar conteúdo para o capítulo.")
+        return {"status": "error", "message": "Falha ao gerar conteúdo para o capítulo."}
+
     updated_chapters = state["chapters"].copy()
     updated_chapters[current]["content"] = response.text
     updates["chapters"] = updated_chapters
@@ -209,7 +241,7 @@ def write_chapter(state: BookState, model, st_session=None) -> Dict[str, Any]:
     if st_session:
         # st_session.write(f"### Capítulo {current}: {chapter_info['title']}")
         st_session.write(response.text)
-    
+    time.sleep(5)
     updates["current_chapter"] = current + 1
     updates["status"] = "chapter_written" if updates["current_chapter"] <= len(state["chapters"]) else "all_chapters_written"
     return updates
@@ -236,8 +268,13 @@ def review_and_edit(state: BookState, model) -> Dict[str, Any]:
     Forneça feedback sobre estrutura, fluxo narrativo, consistência com o tema "{state['theme']}" 
     e apelo ao público-alvo. Sugira melhorias. Revise tecnicamente o livro e verifique se há alguma inconsistência.
     """
-    
-    response = model.generate_content(prompt)
+
+    response = generate_with_retry(model, prompt)
+
+    if not response:
+        logger.error("Falha ao gerar feedback.")
+        return {"status": "error", "message": "Falha ao gerar feedback."}
+
     updates = {
         "feedback": response.text,
         "status": "reviewed"
@@ -455,12 +492,22 @@ def export_book(state: BookState) -> Dict[str, Any]:
                     table_rows.append(row)
                 elif table_rows:  # Fim da tabela após separador
                     in_table = False
-                    table = doc.add_table(rows=len(table_rows), cols=len(table_rows[0]))
-                    table.style = 'Table Grid'
-                    for r_idx, row in enumerate(table_rows):
-                        for c_idx, cell_text in enumerate(row):
-                            cell = table.rows[r_idx].cells[c_idx]
-                            apply_inline_formatting(cell_text, cell.paragraphs[0])
+                    # ADICIONE ESTA VERIFICAÇÃO
+                    if len(table_rows) > 0 and len(table_rows[0]) > 0:
+                        table = doc.add_table(rows=len(table_rows), cols=len(table_rows[0]))
+                        table.style = 'Table Grid'
+                        for r_idx, row_data in enumerate(table_rows):
+                            # Garante que todas as linhas tenham o mesmo número de colunas
+                            if len(row_data) == len(table_rows[0]):
+                                for c_idx, cell_text in enumerate(row_data):
+                                    try:
+                                        cell = table.rows[r_idx].cells[c_idx]
+                                        apply_inline_formatting(cell_text, cell.paragraphs[0])
+                                    except IndexError:
+                                        logger.warning(f"Ignorando célula fora do alcance na tabela. Linha {r_idx}, Coluna {c_idx}")
+                    else:
+                        logger.warning("Ignorando tentativa de criar uma tabela vazia ou malformada.")
+                    table_rows = [] # Limpa para a próxima tabela
                 continue
 
             # Parágrafo simples
@@ -566,11 +613,23 @@ def create_book_agent(model, st_session=None):
     memory = MemorySaver()
     return workflow.compile(checkpointer=memory)
 
-def main(custom_theme: str = "", custom_genre: str = "", custom_audience: str = "", st_session=None):
+def generate_with_retry(model, prompt, retries=3, delay=5):
+    for i in range(retries):
+        try:
+            response = model.generate_content(prompt)
+            return response
+        except Exception as e:
+            logger.warning(f"Erro na chamada da API (tentativa {i+1}/{retries}): {e}")
+            time.sleep(delay)
+    logger.error("Falha ao gerar conteúdo após múltiplas tentativas.")
+    return None # Ou lançar uma exceção
+
+def agent_book_generator( custom_main_category: str = "", custom_genre: str = "", custom_audience: str = "", custom_theme: str = "", custom_num_chapters: int = 5, st_session=None):
     """Executa o agente de geração de livros."""
     logger.info("Iniciando processo de geração de livro...")
     try:
-        model = init_gemini_api(os.getenv("GEMINI_API_KEY"))
+        # model = init_gemini_api(os.getenv("GEMINI_API_KEY"))
+        model = init_vertex_ai()
         book_agent = create_book_agent(model, st_session)
         
         initial_state = BookState(status="start")
@@ -578,10 +637,13 @@ def main(custom_theme: str = "", custom_genre: str = "", custom_audience: str = 
             initial_state["theme"] = custom_theme
         if custom_genre:
             initial_state["genre"] = custom_genre
+        if custom_main_category:
+            initial_state["main_category"] = custom_main_category
         if custom_audience:
             initial_state["target_audience"] = custom_audience
+        initial_state["num_chapters"] = custom_num_chapters
         
-        config = {"configurable": {"thread_id": "1"},"recursion_limit": 100}
+        config = {"configurable": {"thread_id": "1"},"recursion_limit": 500}
         
         for output in book_agent.stream(initial_state, config=config):
             node_name = list(output.keys())[0] if output else "unknown"
