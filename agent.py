@@ -197,13 +197,7 @@ def write_chapter(state: BookState, model, st_session=None) -> Dict[str, Any]:
     
     chapter_info = state["chapters"][current]
     logger.info(f"Escrevendo Capítulo {current}: {chapter_info['title']}...")
-    
-    # Notificar o Streamlit sobre o progresso
-    if st_session:
-        st_session.write(f"Gerando Capítulo {current}: {chapter_info['title']}")
-        progress = int((current / len(state["chapters"])) * 100)
-        st_session.progress(progress)
-    
+        
     prev_content = ""
     if current > 1 and state["chapters"].get(current-1, {}).get("content"):
         prev_chapter = state["chapters"][current-1]
@@ -624,56 +618,69 @@ def generate_with_retry(model, prompt, retries=3, delay=5):
     logger.error("Falha ao gerar conteúdo após múltiplas tentativas.")
     return None # Ou lançar uma exceção
 
-def agent_book_generator( custom_main_category: str = "", custom_genre: str = "", custom_audience: str = "", custom_theme: str = "", custom_num_chapters: int = 5, st_session=None):
-    """Executa o agente de geração de livros."""
+def agent_book_generator(custom_main_category: str = "", custom_genre: str = "", custom_audience: str = "", custom_theme: str = "", custom_num_chapters: int = 5):
+    """Executa o agente de geração de livros e emite atualizações de progresso."""
     logger.info("Iniciando processo de geração de livro...")
     try:
-        # model = init_gemini_api(os.getenv("GEMINI_API_KEY"))
         model = init_vertex_ai()
-        book_agent = create_book_agent(model, st_session)
+        book_agent = create_book_agent(model) 
         
         initial_state = BookState(status="start")
-        if custom_theme:
-            initial_state["theme"] = custom_theme
-        if custom_genre:
-            initial_state["genre"] = custom_genre
-        if custom_main_category:
-            initial_state["main_category"] = custom_main_category
-        if custom_audience:
-            initial_state["target_audience"] = custom_audience
+        # ... (código de preenchimento do initial_state) ...
+        if custom_theme: initial_state["theme"] = custom_theme
+        if custom_genre: initial_state["genre"] = custom_genre
+        if custom_main_category: initial_state["main_category"] = custom_main_category
+        if custom_audience: initial_state["target_audience"] = custom_audience
         initial_state["num_chapters"] = custom_num_chapters
-        
-        config = {"configurable": {"thread_id": "1"},"recursion_limit": 500}
+
+        config = {"configurable": {"thread_id": "1"}, "recursion_limit": 500}
         
         for output in book_agent.stream(initial_state, config=config):
             node_name = list(output.keys())[0] if output else "unknown"
-            stage = output.get(node_name, {}).get("status", "desconhecido")
-            if st_session:
-                st_session.write(f"Concluído: {stage}")
+            node_output = output.get(node_name, {})
+            stage = node_output.get("status", "desconhecido")
+            
+            # --- INÍCIO DA LÓGICA DA BARRA DE PROGRESSO ---
+            # Verifica se estamos na etapa de escrita e se temos os dados necessários
+            if node_name == "write_chapter" and "chapters" in node_output:
+                # O 'current_chapter' no estado já foi incrementado, então subtraímos 1 para pegar o que acabou de ser escrito.
+                current = node_output.get("current_chapter", 1) - 1
+                if current > 0: # Garante que não tentemos acessar o capítulo 0
+                    total = len(node_output["chapters"])
+                    title = node_output["chapters"][current]["title"]
+                    
+                    # Emite um dicionário especial para o progresso
+                    yield {
+                        "type": "progress",
+                        "text": f"Capítulo {current}/{total}: {title}",
+                        "value": int((current / total) * 100)
+                    }
+            # --- FIM DA LÓGICA DA BARRA DE PROGRESSO ---
+
+            # O restante do código de 'yield' para o conteúdo de texto continua o mesmo
+            yield f"**Etapa Concluída:** {stage}"
+
             if stage == "book_info_collected":
-                if st_session:
-                    st_session.write(f"**Tema:** {output[node_name]['theme']}")
-                    st_session.write(f"**Título gerado:** {output[node_name]['title']}")
-                    st_session.write(f"**Gênero:** {output[node_name]['genre']}")
-                    st_session.write(f"**Público-alvo:** {output[node_name]['target_audience']}")
+                yield f"**Título gerado:** {node_output.get('title', 'N/A')}"
+            
             elif stage == "outline_created":
-                if st_session:
-                    st_session.write(f"Sumário criado com {len(output[node_name]['outline'])} capítulos")
+                yield f"Sumário criado com {len(node_output.get('outline', []))} capítulos."
+
             elif stage == "chapter_written":
-                if st_session:
-                    st_session.write(f"Capítulo {output[node_name]['current_chapter']-1} concluído")
-            elif stage == "feedback_exported":
-                if st_session:
-                    st_session.write(f"Feedback exportado para: {output[node_name]['feedback_path']}")
-            elif stage == "exported":
-                if st_session:
-                    st_session.write(f"Livro exportado para: {output[node_name]['export_path']}")
+                current_chap_num = node_output.get('current_chapter', 0) - 1
+                if current_chap_num > 0:
+                    chapters_data = node_output.get("chapters", {})
+                    chapter_content = chapters_data.get(current_chap_num, {}).get("content", "")
+                    chapter_title = chapters_data.get(current_chap_num, {}).get("title", "")
+                    
+                    yield f"### Capítulo {current_chap_num}: {chapter_title}"
+                    yield chapter_content
         
         final_state = book_agent.checkpointer.get(config)
         logger.info("Processo de geração de livro concluído!")
-        return final_state
+        
+        yield {"final_state": final_state}
+
     except Exception as e:
         logger.error(f"Erro durante a geração do livro: {e}")
-        if st_session:
-            st_session.error(f"Erro durante a geração do livro: {e}")
-        return {"status": "error", "message": str(e)}
+        yield {"final_state": {"status": "error", "message": str(e)}}
