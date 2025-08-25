@@ -3,7 +3,6 @@ langchain
 langchain-core
 langgraph-checkpoint
 langchain-google-vertexai
-google.cloud
 google-cloud-aiplatform
 google.generativeai
 python-dotenv
