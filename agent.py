@@ -17,7 +17,7 @@ from google.cloud import aiplatform
 from vertexai.generative_models import GenerativeModel, Part
 import vertexai
 
-# import google.generativeai as genai
+import google.generativeai as genai
 
 # Biblioteca para exportação
 import docx
@@ -41,25 +41,25 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Inicializar Gemini API
-# def init_gemin_api(api_key: str):
-#     """Inicializa a conexão com o Gemini API."""
-#     logger.info("Inicializando Gemini API...")
-#     genai.configure(api_key=api_key)
-#     return genai.GenerativeModel('gemini-2.0-flash')
+def init_gemin_api():
+    """Inicializa a conexão com o Gemini API."""
+    logger.info("Inicializando Gemini API...")
+    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+    return genai.GenerativeModel('gemini-2.5-flash')
 
-def init_vertex_ai():
-    """Inicializa a conexão com o Vertex AI usando credenciais do ambiente."""
-    logger.info("Inicializando Vertex AI...")
-    project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
-    if not project_id:
-        raise ValueError("A variável de ambiente GOOGLE_CLOUD_PROJECT não foi definida.")
+# def init_vertex_ai():
+#     """Inicializa a conexão com o Vertex AI usando credenciais do ambiente."""
+#     logger.info("Inicializando Vertex AI...")
+#     project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
+#     if not project_id:
+#         raise ValueError("A variável de ambiente GOOGLE_CLOUD_PROJECT não foi definida.")
     
-    vertexai.init(project=project_id)
+#     vertexai.init(project=project_id)
     
-    # IMPORTANTE: O nome do modelo no Vertex AI pode ser um pouco diferente.
-    # Verifique na documentação do Vertex AI o identificador correto para o modelo que deseja.
-    # "gemini-1.5-flash-001" é um exemplo comum e robusto.
-    return GenerativeModel("gemini-2.0-flash")
+#     # IMPORTANTE: O nome do modelo no Vertex AI pode ser um pouco diferente.
+#     # Verifique na documentação do Vertex AI o identificador correto para o modelo que deseja.
+#     # "gemini-1.5-flash-001" é um exemplo comum e robusto.
+#     return GenerativeModel("gemini-2.0-flash")
 
 # Função auxiliar para parsing seguro de JSON
 def safe_json_parse(response_text: str, fallback: Any) -> Any:
@@ -117,7 +117,7 @@ def get_book_info(state: BookState, model) -> Dict[str, Any]:
     Gênero Específico: {genre}
     Público-Alvo: {target_audience}
     Responda SOMENTE em formato JSON com a chave "title", sem texto adicional. Exemplo: {{"title": "Fundamentos de Exploração Espacial"}}. Não inclua bloco de código, ou seja ```json```
-    O Título deve ter no máximo 80 caracteres. Caracteres inválidos para o título: , \ / : * ? " < > |
+    O Título deve ter no máximo 80 caracteres. Caracteres inválidos para o título: , \\ / : * ? " < > |
     """
     
     logger.info("Gerando título com base no tema...")
@@ -622,7 +622,8 @@ def agent_book_generator(custom_main_category: str = "", custom_genre: str = "",
     """Executa o agente de geração de livros e emite atualizações de progresso."""
     logger.info("Iniciando processo de geração de livro...")
     try:
-        model = init_vertex_ai()
+        # model = init_vertex_ai()
+        model = init_gemin_api()
         book_agent = create_book_agent(model) 
         
         initial_state = BookState(status="start")
