@@ -111,6 +111,10 @@ graph TD
     B -- "Interage com" --> Q;
 ```
 
+### Arquitetura
+
+![Arquitetura da Solução](./gerador de apostiladrawio.drawio.png)
+
 ### Melhorias Futuras
 
 *   **Edição Interativa**: Permitir que o usuário edite o conteúdo do livro durante o processo de geração.
