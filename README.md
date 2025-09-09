@@ -113,7 +113,7 @@ graph TD
 
 ### Arquitetura
 
-![Arquitetura da Solução](./gerador de apostiladrawio.drawio.png)
+![Arquitetura da Solução](./gerador_de_apostiladrawio.drawio.png)
 
 ### Melhorias Futuras
 
