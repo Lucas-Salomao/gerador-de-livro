@@ -1,9 +1,3 @@
-langgraph
-langchain
-langchain-core
-langgraph-checkpoint
-langchain-google-vertexai
-google-cloud-aiplatform
 google-generativeai
 python-dotenv
 python-docx
