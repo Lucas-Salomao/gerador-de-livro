@@ -4,7 +4,7 @@ langchain-core
 langgraph-checkpoint
 langchain-google-vertexai
 google-cloud-aiplatform
-google.generativeai
+google-generativeai
 python-dotenv
 python-docx
 streamlit
