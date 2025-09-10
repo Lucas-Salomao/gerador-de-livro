@@ -3,7 +3,7 @@ from agent import agent_book_generator
 import os
 
 st.set_page_config(
-    page_title="Gerador de Livros e Apostilas",
+    page_title="Gerador de Apostilas",
     page_icon="📚",
     menu_items={'About': "SENAI São Paulo - Gerência de Educação\n\nSupervisão de Tecnologias Educacionais\n\nDesenvolvido por Lucas Salomão"},
     layout="wide"
@@ -54,7 +54,7 @@ def sidebar():
 
 def frontend():
     """Renderiza a interface principal e gerencia a lógica da aplicação."""
-    st.title("📚 Gerador de Livros e Apostilas")
+    st.title("📚 Gerador de Apostilas")
     
     # Obtém os valores e widgets da sidebar
     categoria, genero, audience, theme, chapters, generate_button, progress_label, progress_bar = sidebar()
