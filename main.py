@@ -38,7 +38,7 @@ def sidebar():
             genero_especifico = st.selectbox("2. Gênero Específico", options=opcoes_genero, index=0)
 
         audience = st.text_input("Público-Alvo", placeholder="Ex: Estudantes de graduação")
-        theme = st.text_area("Tema do Livro", placeholder="Ex: Uma introdução à Inteligência Artificial", height=150)
+        theme = st.text_area("Tema da apostila", placeholder="Ex: Uma introdução à Inteligência Artificial", height=150)
         chapters = st.number_input("Número de Capítulos", min_value=5, value=10, step=1, max_value=50)
 
         # O botão agora só dispara a ação, a lógica fica no frontend
