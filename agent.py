@@ -13,9 +13,9 @@ from langgraph.checkpoint.memory import MemorySaver
 import langchain
 
 # Bibliotecas para Gemini/Vertex AI
-from google.cloud import aiplatform
-from vertexai.generative_models import GenerativeModel, Part
-import vertexai
+# from google.cloud import aiplatform
+# from vertexai.generative_models import GenerativeModel, Part
+# import vertexai
 
 import google.generativeai as genai
 
