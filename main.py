@@ -1,6 +1,7 @@
 import streamlit as st
-from agent import agent_book_generator
+from adk_agent import adk_book_generator
 import os
+from tools import google_search # This is an experiment
 
 st.set_page_config(
     page_title="Gerador de Apostilas",
@@ -83,11 +84,26 @@ def frontend():
             progress_bar.progress(0)
 
             # Itera sobre o gerador do agente
-            for message in agent_book_generator(categoria, genero, audience, theme, chapters):
+            agent_inputs = {
+                "main_category": categoria,
+                "genre": genero,
+                "target_audience": audience,
+                "theme": theme,
+                "num_chapters": chapters,
+            }
+            for message in adk_book_generator(search_tool=google_search, **agent_inputs):
                 if isinstance(message, dict):
                     if message.get("type") == "progress":
                         progress_label.text(message["text"])
                         progress_bar.progress(message["value"])
+                    elif message.get("type") == "info":
+                        st.session_state.generation_log.append(f"**Título gerado:** {message.get('title', 'N/A')}")
+                    elif message.get("type") == "outline":
+                        st.session_state.generation_log.append(f"Sumário criado com {len(message.get('outline', []))} capítulos.")
+                    elif message.get("type") == "chapter":
+                        log_entry = f"### Capítulo {message.get('chapter_number')}: {message.get('title')}\n{message.get('content')}"
+                        st.session_state.generation_log.append(log_entry)
+                        content_container.markdown(log_entry, unsafe_allow_html=True)
                     elif "final_state" in message:
                         st.session_state.final_result = message["final_state"]
                         progress_label.text("Geração Concluída!")
@@ -107,7 +123,7 @@ def frontend():
         st.markdown("---")
         
         result = st.session_state.final_result
-        st.session_state.book_path=result["channel_values"]["export_path"]
+        st.session_state.book_path=result.get("export_path")
         if result.get("status") != "error":
             book_path = st.session_state.book_path
             if book_path and os.path.exists(book_path):
