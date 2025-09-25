@@ -81,10 +81,8 @@ def sidebar():
         st.subheader("Progresso da geração")
         progress_label = st.empty()
         progress_bar = st.empty()
-        
+            
         st.markdown("---")
-        if st.button("Sair", icon='🚪'):
-            st.logout()
 
     return area_selecionada, audience, theme, chapters, generate_button, progress_label, progress_bar
 
@@ -92,13 +90,24 @@ def frontend():
     """Renderiza a interface principal e gerencia a lógica da aplicação."""
     st.title("📚 Gerador de Apostila")
     
+    content_container = st.container()
+    
     # Obtém os valores e widgets da sidebar
     area_selecionada, audience, theme, chapters, generate_button, progress_label, progress_bar = sidebar()
 
+    with st.sidebar:
+        if st.button("Limpar Tela", icon='🧹'):
+            content_container.empty()
+            st.session_state.generation_log = []
+            st.session_state.final_result = None
+            
+        if st.button("Sair", icon='🚪'):
+            st.logout()
+    
     # --- Lógica de Exibição PERSISTENTE (sempre executa) ---
     # Este container garante que o conteúdo permaneça na tela em qualquer interação
     # (como clicar no botão de download).
-    content_container = st.container()
+    
     with content_container:
         for log_entry in st.session_state.generation_log:
             st.markdown(log_entry, unsafe_allow_html=True)
