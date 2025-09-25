@@ -24,21 +24,52 @@ def sidebar():
         st.title("Bem vindo, "+st.user.given_name+"!")
         st.header("⚙️ Configurações")
 
-        generos_agrupados = {
-            "Ficção": ["Aventura", "Contos", "Distopia", "Fantasia", "Ficção Científica", "Ficção Histórica", "Ficção Policial", "Humor", "Infantojuvenil", "Literatura Clássica", "Mistério", "Romance", "Suspense", "Terror"],
-            "Não Ficção Geral": ["Arte e Fotografia", "Autoajuda", "Autobiografia e Memórias", "Biografia", "Ciências Sociais", "Culinária", "Ensaios", "Esportes", "Filosofia", "História", "Política", "Psicologia", "Religião e Espiritualidade", "Viagem"],
-            "Técnico": ["Administração e Negócios", "Arquitetura e Design", "Ciência de Dados", "Ciências Exatas (Física, Matemática, Química)", "Ciências Biológicas e da Saúde", "Computação e Programação", "Direito", "Economia e Finanças", "Educação e Pedagogia", "Engenharia", "Marketing e Vendas", "Medicina", "Tecnologia da Informação (TI)"]
-        }
+        # generos_agrupados = {
+        #     "Ficção": ["Aventura", "Contos", "Distopia", "Fantasia", "Ficção Científica", "Ficção Histórica", "Ficção Policial", "Humor", "Infantojuvenil", "Literatura Clássica", "Mistério", "Romance", "Suspense", "Terror"],
+        #     "Não Ficção Geral": ["Arte e Fotografia", "Autoajuda", "Autobiografia e Memórias", "Biografia", "Ciências Sociais", "Culinária", "Ensaios", "Esportes", "Filosofia", "História", "Política", "Psicologia", "Religião e Espiritualidade", "Viagem"],
+        #     "Técnico": ["Administração e Negócios", "Arquitetura e Design", "Ciência de Dados", "Ciências Exatas (Física, Matemática, Química)", "Ciências Biológicas e da Saúde", "Computação e Programação", "Direito", "Economia e Finanças", "Educação e Pedagogia", "Engenharia", "Marketing e Vendas", "Medicina", "Tecnologia da Informação (TI)"]
+        # }
         
-        categorias_principais = ["Selecione uma categoria"] + list(generos_agrupados.keys())
-        categoria_principal = st.selectbox("1. Categoria Principal", options=categorias_principais, index=0)
+        # categorias_principais = ["Selecione uma categoria"] + list(generos_agrupados.keys())
+        # categoria_principal = st.selectbox("1. Categoria Principal", options=categorias_principais, index=0)
         
-        genero_especifico = None
-        if categoria_principal != "Selecione uma categoria":
-            opcoes_genero = ["Selecione um gênero"] + sorted(generos_agrupados[categoria_principal])
-            genero_especifico = st.selectbox("2. Gênero Específico", options=opcoes_genero, index=0)
+        # genero_especifico = None
+        # if categoria_principal != "Selecione uma categoria":
+        #     opcoes_genero = ["Selecione um gênero"] + sorted(generos_agrupados[categoria_principal])
+        #     genero_especifico = st.selectbox("2. Gênero Específico", options=opcoes_genero, index=0)
+        
+        areas_tecnologicas = [
+            "COMERCIAL",
+            "COMUNICAÇÃO MIDIÁTICA",
+            "CONSTRUÇÃO DE OBRAS",
+            "DESENVOLVIMENTO DE SISTEMAS",
+            "DESIGN",
+            "ELETRÔNICA E AUTOMAÇÃO",
+            "GERENCIAL",
+            "GESTÃO E PROMOÇÃO DA SAÚDE E BEM-ESTAR",
+            "GESTÃO E SEGURANÇA",
+            "INFRAESTRUTURA DE INFORMAÇÃO E COMUNICAÇÃO",
+            "MANUFATURA",
+            "MANUTENÇÃO E OPERAÇÃO",
+            "MATERIAIS",
+            "METALMECÂNICA",
+            "MINERAÇÃO E EXTRAÇÃO",
+            "OPERAÇÕES DE TRANSPORTE",
+            "OPERAÇÕES FINANCEIRAS",
+            "PRODUÇÃO ALIMENTÍCIA",
+            "PROTEÇÃO E REABILITAÇÃO DE ECOSSISTEMAS",
+            "QUÍMICA",
+            "SEGURANÇA",
+            "SISTEMAS DE ENERGIA",
+            "TÊXTIL E VESTUÁRIO"
+        ]
+        area_selecionada = st.selectbox(
+            label="Escolha uma área técnologica",
+            options=areas_tecnologicas
+        )
+        
 
-        audience = st.text_input("Público-Alvo", placeholder="Ex: Estudantes de graduação")
+        audience = st.text_input("Público-Alvo", placeholder="Ex: Estudantes de Curso Técnico")
         theme = st.text_area("Tema da apostila", placeholder="Ex: Uma introdução à Inteligência Artificial", height=150)
         chapters = st.number_input("Número de Capítulos", min_value=5, value=5, step=1, max_value=100)
 
@@ -55,14 +86,14 @@ def sidebar():
         if st.button("Sair", icon='🚪'):
             st.logout()
 
-    return categoria_principal, genero_especifico, audience, theme, chapters, generate_button, progress_label, progress_bar
+    return area_selecionada, audience, theme, chapters, generate_button, progress_label, progress_bar
 
 def frontend():
     """Renderiza a interface principal e gerencia a lógica da aplicação."""
     st.title("📚 Gerador de Apostila")
     
     # Obtém os valores e widgets da sidebar
-    categoria, genero, audience, theme, chapters, generate_button, progress_label, progress_bar = sidebar()
+    area_selecionada, audience, theme, chapters, generate_button, progress_label, progress_bar = sidebar()
 
     # --- Lógica de Exibição PERSISTENTE (sempre executa) ---
     # Este container garante que o conteúdo permaneça na tela em qualquer interação
@@ -74,7 +105,7 @@ def frontend():
 
     # --- Lógica de Geração (executada apenas quando o botão é clicado) ---
     if generate_button:
-        if not all([theme, audience, genero, genero != "Selecione um gênero"]):
+        if not all([theme, audience, area_selecionada]):
             st.warning("Por favor, preencha todos os campos para iniciar.")
         else:
             # Limpa resultados antigos da memória
@@ -88,7 +119,7 @@ def frontend():
             progress_bar.progress(0)
 
             # Itera sobre o gerador do agente
-            for message in agent_book_generator(categoria, genero, audience, theme, chapters):
+            for message in agent_book_generator(area_tecnologica=area_selecionada, custom_audience=audience, custom_theme=theme, custom_num_chapters=chapters):
                 if isinstance(message, dict):
                     if message.get("type") == "progress":
                         progress_label.text(message["text"])

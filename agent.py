@@ -83,8 +83,7 @@ def safe_json_parse(response_text: str, fallback: Any) -> Any:
 class BookState(TypedDict, total=False):
     theme: str
     title: str
-    genre: str
-    main_category: str
+    area_tecnologica: str
     target_audience: str
     num_chapters: int
     outline: List[Dict[str, Any]]
@@ -103,18 +102,17 @@ def get_book_info(state: BookState, model) -> Dict[str, Any]:
     updates = {}
     
     theme = state.get("theme", "Um tema genérico")
-    genre = state.get("genre", "Ficção")
+    area_tecnologica = state.get("area_tecnologica", "Não especificada")
     target_audience = state.get("target_audience", "Adultos")
     
     updates["theme"] = theme
-    updates["genre"] = genre
+    updates["area_tecnologica"] = area_tecnologica
     updates["target_audience"] = target_audience
     
     prompt = f"""
-    Você é um especialista em redação técnica. Baseado no seguinte tema, gênero e público-alvo, sugira um título formal e técnico que reflita um enfoque analítico e informativo:
+    Você é um especialista em redação técnica. Baseado no seguinte tema, área tecnológica e público-alvo, sugira um título formal e técnico que reflita um enfoque analítico e informativo:
     Tema: {theme}
-    Categoria Principal: {state.get('main_category', 'Não especificada')}
-    Gênero Específico: {genre}
+    Área Tecnológica: {area_tecnologica}
     Público-Alvo: {target_audience}
     Responda SOMENTE em formato JSON com a chave "title", sem texto adicional. Exemplo: {{"title": "Fundamentos de Exploração Espacial"}}. Não inclua bloco de código, ou seja ```json```
     O Título deve ter no máximo 80 caracteres. Caracteres inválidos para o título: , \\ / : * ? " < > |
@@ -141,8 +139,7 @@ def create_outline(state: BookState, model) -> Dict[str, Any]:
     
     Tema: {state['theme']}
     Título sugerido: {state['title']}
-    Categoria Principal: {state.get('main_category', 'Não especificada')}
-    Gênero Específico: {state['genre']}
+    Área Tecnológica: {state.get('area_tecnologica', 'Não especificada')}
     Público-Alvo: {state['target_audience']}
     
     Cada capítulo deve ter uma numeração inteira e sequencial (exemplo: 1, 2, 3, 4, 5, etc.)
@@ -208,7 +205,7 @@ def write_chapter(state: BookState, model, st_session=None) -> Dict[str, Any]:
     
     prompt = f"""
     Você é um especialista técnico escrevendo um livro intitulado "{state['title']}" com o tema "{state['theme']}".
-    A categoria principal do livro é "{state.get('main_category', 'Não especificada')}" e o gênero específico é "{state['genre']}", direcionado para o público "{state['target_audience']}"
+    A área tecnológica do livro é "{state.get('area_tecnologica', 'Não especificada')}", direcionado para o público "{state['target_audience']}"
     
     Escreva o Capítulo {current}: "{chapter_info['title']}".
     
@@ -246,7 +243,7 @@ def review_and_edit(state: BookState, model) -> Dict[str, Any]:
     book_summary = f"""
     Tema: {state['theme']}
     Título: {state['title']}
-    Gênero: {state['genre']}
+    Área Tecnológica: {state.get('area_tecnologica', 'Não especificada')}
     Público-alvo: {state['target_audience']}
     
     Sumário:
@@ -389,8 +386,8 @@ def export_book(state: BookState) -> Dict[str, Any]:
     info_paragraph = doc.add_paragraph()
     info_paragraph.add_run("Tema: ").bold = True
     info_paragraph.add_run(state["theme"])
-    info_paragraph.add_run("\nGênero: ").bold = True
-    info_paragraph.add_run(state["genre"])
+    info_paragraph.add_run("\nÁrea Tecnológica: ").bold = True
+    info_paragraph.add_run(state["area_tecnologica"])
     info_paragraph.add_run("\nPúblico-alvo: ").bold = True
     info_paragraph.add_run(state["target_audience"])
     doc.add_page_break()
@@ -618,7 +615,7 @@ def generate_with_retry(model, prompt, retries=3, delay=5):
     logger.error("Falha ao gerar conteúdo após múltiplas tentativas.")
     return None # Ou lançar uma exceção
 
-def agent_book_generator(custom_main_category: str = "", custom_genre: str = "", custom_audience: str = "", custom_theme: str = "", custom_num_chapters: int = 5):
+def agent_book_generator(area_tecnologica: str = "", custom_audience: str = "", custom_theme: str = "", custom_num_chapters: int = 5):
     """Executa o agente de geração de livros e emite atualizações de progresso."""
     logger.info("Iniciando processo de geração de livro...")
     try:
@@ -629,8 +626,7 @@ def agent_book_generator(custom_main_category: str = "", custom_genre: str = "",
         initial_state = BookState(status="start")
         # ... (código de preenchimento do initial_state) ...
         if custom_theme: initial_state["theme"] = custom_theme
-        if custom_genre: initial_state["genre"] = custom_genre
-        if custom_main_category: initial_state["main_category"] = custom_main_category
+        if area_tecnologica: initial_state["area_tecnologica"] = area_tecnologica
         if custom_audience: initial_state["target_audience"] = custom_audience
         initial_state["num_chapters"] = custom_num_chapters
 
