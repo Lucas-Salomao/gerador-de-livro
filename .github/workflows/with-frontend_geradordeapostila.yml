@@ -17,7 +17,19 @@ jobs:
       contents: read #This is required for actions/checkout
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Create Streamlit secrets.toml
+        run: |
+          mkdir -p .streamlit
+          echo "[auth]
+          redirect_uri = \"${{ secrets.REDIRECT_URI }}\"
+          cookie_secret = \"${{ secrets.COOKIE_SECRET }}\"
+          client_id = \"${{ secrets.CLIENT_ID }}\"
+          client_secret = \"${{ secrets.CLIENT_SECRET }}\"
+          server_metadata_url = \"${{ secrets.SERVER_METADATA_URL }}\"
+          " > .streamlit/secrets.toml
 
       - name: Set up Python version
         uses: actions/setup-python@v5

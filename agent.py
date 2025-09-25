@@ -634,7 +634,7 @@ def agent_book_generator(custom_main_category: str = "", custom_genre: str = "",
         if custom_audience: initial_state["target_audience"] = custom_audience
         initial_state["num_chapters"] = custom_num_chapters
 
-        config = {"configurable": {"thread_id": "1"}, "recursion_limit": 500}
+        config = {"configurable": {"thread_id": "1"}, "recursion_limit": 1000}
         
         for output in book_agent.stream(initial_state, config=config):
             node_name = list(output.keys())[0] if output else "unknown"

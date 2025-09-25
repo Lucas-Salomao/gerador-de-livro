@@ -21,6 +21,7 @@ def sidebar():
     """Cria a barra lateral e retorna os valores dos widgets."""
     with st.sidebar:
         st.logo("https://www.fiema.org.br/uploads/area/19602/thumb_rBHr9q6LNEE4hOdcW7tzTCZadVauW7me.png", size="large")
+        st.title("Bem vindo, "+st.user.given_name+"!")
         st.header("⚙️ Configurações")
 
         generos_agrupados = {
@@ -39,7 +40,7 @@ def sidebar():
 
         audience = st.text_input("Público-Alvo", placeholder="Ex: Estudantes de graduação")
         theme = st.text_area("Tema da apostila", placeholder="Ex: Uma introdução à Inteligência Artificial", height=150)
-        chapters = st.number_input("Número de Capítulos", min_value=5, value=10, step=1, max_value=50)
+        chapters = st.number_input("Número de Capítulos", min_value=5, value=5, step=1, max_value=100)
 
         # O botão agora só dispara a ação, a lógica fica no frontend
         generate_button = st.button("🌟 Gerar Livro")
@@ -49,6 +50,10 @@ def sidebar():
         st.subheader("Progresso da Geração")
         progress_label = st.empty()
         progress_bar = st.empty()
+        
+        st.markdown("---")
+        if st.button("Sair", icon='🚪'):
+            st.logout()
 
     return categoria_principal, genero_especifico, audience, theme, chapters, generate_button, progress_label, progress_bar
 
@@ -125,4 +130,27 @@ def frontend():
             st.error(f"Ocorreu um erro no agente: {result.get('message')}")
 
 if __name__ == "__main__":
-    frontend()
+    if not st.user.is_logged_in:
+        st.markdown(
+            """
+            <div style="text-align: center;">
+                <img src="https://staticportaldaindustria.azureedge.net/static/img/logos/atualizado_2/senai.svg" alt="Logo SENAI" height="70">
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            "<h1 style='text-align: center;'>Gerador de Apostila</h1>",
+            unsafe_allow_html=True
+        )
+            
+        st.markdown(
+            "<h2 style='text-align: center;'>👤 Login</h2>",
+            unsafe_allow_html=True
+        )
+        col1, col2, col3 = st.columns([5, 1.5, 5]) # Cria 3 colunas para empurrar o botão para o centro
+        with col2:
+            if st.button("Entrar com Meu Senai", use_container_width=True):
+                st.login()
+    else:
+        frontend()
