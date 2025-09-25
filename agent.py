@@ -621,8 +621,8 @@ def agent_book_generator(area_tecnologica: str = "", custom_audience: str = "", 
     try:
         # model = init_vertex_ai()
         model = init_gemin_api()
-        book_agent = create_book_agent(model) 
-        
+        book_agent = create_book_agent(model)
+
         initial_state = BookState(status="start")
         # ... (código de preenchimento do initial_state) ...
         if custom_theme: initial_state["theme"] = custom_theme
@@ -631,27 +631,60 @@ def agent_book_generator(area_tecnologica: str = "", custom_audience: str = "", 
         initial_state["num_chapters"] = custom_num_chapters
 
         config = {"configurable": {"thread_id": "1"}, "recursion_limit": 1000}
-        
+
+        # Define o número total de etapas para a barra de progresso
+        total_steps = 2 + custom_num_chapters + 2  # Título, Sumário, N Capítulos, Revisão, Exportação
+
         for output in book_agent.stream(initial_state, config=config):
             node_name = list(output.keys())[0] if output else "unknown"
             node_output = output.get(node_name, {})
             stage = node_output.get("status", "desconhecido")
-            
-            # --- INÍCIO DA LÓGICA DA BARRA DE PROGRESSO ---
-            # Verifica se estamos na etapa de escrita e se temos os dados necessários
-            if node_name == "write_chapter" and "chapters" in node_output:
-                # O 'current_chapter' no estado já foi incrementado, então subtraímos 1 para pegar o que acabou de ser escrito.
-                current = node_output.get("current_chapter", 1) - 1
-                if current > 0: # Garante que não tentemos acessar o capítulo 0
-                    total = len(node_output["chapters"])
-                    title = node_output["chapters"][current]["title"]
-                    
-                    # Emite um dicionário especial para o progresso
-                    yield {
+
+            # --- LÓGICA DA BARRA DE PROGRESSO MELHORADA ---
+            progress_update = None
+            current_step = 0
+
+            if stage == "book_info_collected":
+                current_step = 1
+                progress_update = {
+                    "type": "progress",
+                    "text": f"Etapa {current_step}/{total_steps}: Gerando título...",
+                    "value": int((current_step / total_steps) * 100)
+                }
+            elif stage == "outline_created":
+                current_step = 2
+                progress_update = {
+                    "type": "progress",
+                    "text": f"Etapa {current_step}/{total_steps}: Criando sumário...",
+                    "value": int((current_step / total_steps) * 100)
+                }
+            elif node_name == "write_chapter" and "chapters" in node_output:
+                written_chapter_num = node_output.get("current_chapter", 1) - 1
+                if written_chapter_num > 0:
+                    current_step = 2 + written_chapter_num
+                    total_chapters = len(node_output["chapters"])
+                    progress_update = {
                         "type": "progress",
-                        "text": f"Capítulo {current}/{total}: {title}",
-                        "value": int((current / total) * 100)
+                        "text": f"Etapa {current_step}/{total_steps}: Escrevendo capítulo {written_chapter_num}/{total_chapters}...",
+                        "value": int((current_step / total_steps) * 100)
                     }
+            elif stage == "reviewed":
+                current_step = 2 + custom_num_chapters + 1
+                progress_update = {
+                    "type": "progress",
+                    "text": f"Etapa {current_step}/{total_steps}: Revisando o conteúdo...",
+                    "value": int((current_step / total_steps) * 100)
+                }
+            elif stage == "exported":
+                current_step = 2 + custom_num_chapters + 2
+                progress_update = {
+                    "type": "progress",
+                    "text": f"Etapa {current_step}/{total_steps}: Gerando documento final...",
+                    "value": int((current_step / total_steps) * 100)
+                }
+            
+            if progress_update:
+                yield progress_update
             # --- FIM DA LÓGICA DA BARRA DE PROGRESSO ---
 
             # O restante do código de 'yield' para o conteúdo de texto continua o mesmo
@@ -659,7 +692,7 @@ def agent_book_generator(area_tecnologica: str = "", custom_audience: str = "", 
 
             if stage == "book_info_collected":
                 yield f"**Título gerado:** {node_output.get('title', 'N/A')}"
-            
+
             elif stage == "outline_created":
                 yield f"Sumário criado com {len(node_output.get('outline', []))} capítulos."
 
@@ -675,10 +708,10 @@ def agent_book_generator(area_tecnologica: str = "", custom_audience: str = "", 
                     if chapter_info and chapter_info.get("content"):
                         yield f"### Capítulo {current_chap_num}: {chapter_info.get('title', '')}"
                         yield chapter_info["content"]
-        
+
         final_state = book_agent.checkpointer.get(config)
         logger.info("Processo de geração de livro concluído!")
-        
+
         yield {"final_state": final_state}
 
     except Exception as e:

@@ -74,11 +74,11 @@ def sidebar():
         chapters = st.number_input("Número de Capítulos", min_value=5, value=5, step=1, max_value=100)
 
         # O botão agora só dispara a ação, a lógica fica no frontend
-        generate_button = st.button("🌟 Gerar Livro")
+        generate_button = st.button("🌟 Gerar Apostila")
 
         # Placeholders para a barra de progresso
         st.markdown("---")
-        st.subheader("Progresso da Geração")
+        st.subheader("Progresso da geração")
         progress_label = st.empty()
         progress_bar = st.empty()
         
