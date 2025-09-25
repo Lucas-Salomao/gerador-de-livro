@@ -689,13 +689,15 @@ def agent_book_generator(area_tecnologica: str = "", custom_audience: str = "", 
             # --- FIM DA LÓGICA DA BARRA DE PROGRESSO ---
 
             # O restante do código de 'yield' para o conteúdo de texto continua o mesmo
-            yield f"**Etapa Concluída:** {stage}"
+            # yield f"**Etapa Concluída:** {stage}"
 
             if stage == "book_info_collected":
-                yield f"**Título gerado:** {node_output.get('title', 'N/A')}"
+                # yield f"**Título gerado:** {node_output.get('title', 'N/A')}"
+                pass
 
             elif stage == "outline_created":
-                yield f"Sumário criado com {len(node_output.get('outline', []))} capítulos."
+                # yield f"Sumário criado com {len(node_output.get('outline', []))} capítulos."
+                pass
 
             # Modificação para exibir o último capítulo
             elif stage == "chapter_written" or (node_name == "write_chapter" and stage == "all_chapters_written"):
