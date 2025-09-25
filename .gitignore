@@ -6,3 +6,4 @@ chatbot.json
 *log
 __pycache__
 secrets.toml
+.txt
