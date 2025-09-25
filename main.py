@@ -147,7 +147,7 @@ def frontend():
         if result.get("status") != "error":
             book_path = st.session_state.book_path
             if book_path and os.path.exists(book_path):
-                st.success("Seu livro está pronto para download!")
+                st.success("Sua apostila está pronta para download!")
                 with open(book_path, "rb") as file:
                     st.download_button(
                         label="Baixar Livro (DOCX)",
