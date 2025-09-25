@@ -134,7 +134,7 @@ def create_outline(state: BookState, model) -> Dict[str, Any]:
     logger.info("Criando sumário do livro...")
     
     prompt = f"""
-    Você é um especialista técnico elaborando um livro técnico para estudo de um determinado tema. 
+    Você é um especialista técnico no tema {state['theme']}, elaborando um livro técnico para estudo de um determinado tema. 
     Baseado nas seguintes informações, crie um sumário detalhado e com foco em aspectos técnicos e práticos:
     
     Tema: {state['theme']}
@@ -213,7 +213,7 @@ def write_chapter(state: BookState, model, st_session=None) -> Dict[str, Any]:
     
     {prev_content}
     
-    Escreva um texto técnico e analítico, com linguagem formal e objetiva. Inclua informações técnicas detalhadas, exemplos contextualizados (reais ou hipotéticos), dados relevantes e explicações claras. Evite diálogos narrativos ou descrições literárias excessivas. Estruture o conteúdo com seções claras (ex.: introdução, análise, exemplos, conclusão). O capítulo deve ter pelo menos 3000 palavras. Seja o mais detalhista possível e aborde o tema do capítulo com profundidade e bastante exemplo.
+    Escreva um texto técnico e analítico, com linguagem formal e objetiva. Inclua informações técnicas detalhadas, exemplos contextualizados (reais ou hipotéticos), dados relevantes e explicações claras. Evite diálogos narrativos ou descrições literárias excessivas. Estruture o conteúdo com seções claras (ex.: introdução, desenvolvimento, análise, exemplos, conclusão). O capítulo deve ter pelo menos 3000 palavras. Seja o mais detalhista e técnico possível e aborde o tema do capítulo com profundidade técnica e bastante exemplos.
     Estruture o capítulo com títulos e subtítulos para facilitar a leitura e compreensão do conteúdo. Siga a numeração do capítulo e estruture os subtítulos com base na numeração do capítulo.
     """
 
@@ -257,7 +257,8 @@ def review_and_edit(state: BookState, model) -> Dict[str, Any]:
     {book_summary}
     
     Forneça feedback sobre estrutura, fluxo narrativo, consistência com o tema "{state['theme']}" 
-    e apelo ao público-alvo. Sugira melhorias. Revise tecnicamente o livro e verifique se há alguma inconsistência.
+    e apelo ao público-alvo. Seja minucioso referente às informações técnicas e sugira melhorias. Revise tecnicamente o livro e verifique se há alguma inconsistência.
+    Traga sugestões de melhorias, correções e ajustes necessários, indicando os capítulos e seções específicas para correção.
     """
 
     response = generate_with_retry(model, prompt)
@@ -409,7 +410,7 @@ def export_book(state: BookState) -> Dict[str, Any]:
     toc_end = OxmlElement('w:fldChar')
     toc_end.set(qn('w:fldCharType'), 'end')
     toc_run._element.append(toc_end)
-    doc.add_paragraph("Clique com o botão direito e escolha 'Atualizar campo' para gerar o sumário.", style='Caption')
+    doc.add_paragraph("Insira o sumário automático manualamente.", style='Caption')
     doc.add_page_break()
 
     # Parser Markdown completo
