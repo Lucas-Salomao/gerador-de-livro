@@ -663,15 +663,18 @@ def agent_book_generator(area_tecnologica: str = "", custom_audience: str = "", 
             elif stage == "outline_created":
                 yield f"Sumário criado com {len(node_output.get('outline', []))} capítulos."
 
-            elif stage == "chapter_written":
+            # Modificação para exibir o último capítulo
+            elif stage == "chapter_written" or (node_name == "write_chapter" and stage == "all_chapters_written"):
+                # O 'current_chapter' no estado já foi incrementado, então subtraímos 1 para pegar o que acabou de ser escrito.
                 current_chap_num = node_output.get('current_chapter', 0) - 1
                 if current_chap_num > 0:
                     chapters_data = node_output.get("chapters", {})
-                    chapter_content = chapters_data.get(current_chap_num, {}).get("content", "")
-                    chapter_title = chapters_data.get(current_chap_num, {}).get("title", "")
-                    
-                    yield f"### Capítulo {current_chap_num}: {chapter_title}"
-                    yield chapter_content
+                    chapter_info = chapters_data.get(current_chap_num)
+
+                    # Garante que a informação do capítulo e o conteúdo existam
+                    if chapter_info and chapter_info.get("content"):
+                        yield f"### Capítulo {current_chap_num}: {chapter_info.get('title', '')}"
+                        yield chapter_info["content"]
         
         final_state = book_agent.checkpointer.get(config)
         logger.info("Processo de geração de livro concluído!")
