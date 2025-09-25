@@ -707,7 +707,6 @@ def agent_book_generator(area_tecnologica: str = "", custom_audience: str = "", 
 
                     # Garante que a informação do capítulo e o conteúdo existam
                     if chapter_info and chapter_info.get("content"):
-                        yield f"### Capítulo {current_chap_num}: {chapter_info.get('title', '')}"
                         yield chapter_info["content"]
 
         final_state = book_agent.checkpointer.get(config)
