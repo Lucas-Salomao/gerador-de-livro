@@ -692,12 +692,20 @@ def agent_book_generator(area_tecnologica: str = "", custom_audience: str = "", 
             # yield f"**Etapa Concluída:** {stage}"
 
             if stage == "book_info_collected":
-                # yield f"**Título gerado:** {node_output.get('title', 'N/A')}"
-                pass
+                title = node_output.get('title', 'Título não gerado')
+                yield f"# {title}\n"
 
             elif stage == "outline_created":
-                # yield f"Sumário criado com {len(node_output.get('outline', []))} capítulos."
-                pass
+                outline = node_output.get('outline', [])
+                if outline:
+                    summary_text = "## Sumário\n---\n"
+                    for item in outline:
+                        num = item.get('chapter_number', 'N/A')
+                        title = item.get('chapter_title', 'Sem título')
+                        desc = item.get('chapter_description', 'Sem descrição')
+                        summary_text += f"### Capítulo {num}: {title}\n"
+                        summary_text += f"*{desc}*\n\n"
+                    yield summary_text
 
             # Modificação para exibir o último capítulo
             elif stage == "chapter_written" or (node_name == "write_chapter" and stage == "all_chapters_written"):
