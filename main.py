@@ -20,7 +20,7 @@ if 'book_path' not in st.session_state:
 def sidebar():
     """Cria a barra lateral e retorna os valores dos widgets."""
     with st.sidebar:
-        st.logo("https://www.fiema.org.br/uploads/area/19602/thumb_rBHr9q6LNEE4hOdcW7tzTCZadVauW7me.png", size="large")
+        st.logo("https://www.imagemhost.com.br/images/2024/11/22/Logo-novo-SENAI_-sem-slogan_755X325.md.png", size="large")
         st.title("Bem vindo, "+st.user.given_name+"!")
         st.header("⚙️ Configurações")
 
