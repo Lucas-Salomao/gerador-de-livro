@@ -16,6 +16,22 @@ if 'final_result' not in st.session_state:
     st.session_state.final_result = None
 if 'book_path' not in st.session_state:
     st.session_state.book_path = None
+
+def check_token_expiration():
+    """
+    Verifica de forma segura se o token de login expirou.
+    Primeiro, garante que st.user e st.user.exp existam antes de fazer a verificação.
+    """
+    
+    # Esta é a verificação crucial para prevenir o erro
+    if not (st.user and hasattr(st.user, 'exp')):
+        # Se o objeto de usuário está inconsistente, força o logout por segurança
+        st.warning("Sessão inválida. Por favor, faça o login novamente.")
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.logout()
+        st.rerun()
+        return # Interrompe a execução da função
     
 def sidebar():
     """Cria a barra lateral e retorna os valores dos widgets."""
@@ -170,7 +186,7 @@ def frontend():
             st.error(f"Ocorreu um erro no agente: {result.get('message')}")
 
 if __name__ == "__main__":
-    if not st.user.is_logged_in:
+    if not (st.user and st.user.is_logged_in):
         st.markdown(
             """
             <div style="text-align: center;">
@@ -193,4 +209,6 @@ if __name__ == "__main__":
             if st.button("Entrar com Meu Senai", use_container_width=True):
                 st.login()
     else:
+        check_token_expiration()
+        
         frontend()
