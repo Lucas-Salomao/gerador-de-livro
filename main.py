@@ -87,7 +87,7 @@ def sidebar():
 
         audience = st.text_input("Público-Alvo", placeholder="Ex: Estudantes de Curso Técnico")
         theme = st.text_area("Tema da apostila", placeholder="Ex: Uma introdução à Inteligência Artificial", height=150)
-        chapters = st.number_input("Número de Capítulos", min_value=5, value=5, step=1, max_value=100)
+        chapters = st.number_input("Número de Capítulos", min_value=1, value=1, step=1, max_value=100)
 
         # O botão agora só dispara a ação, a lógica fica no frontend
         generate_button = st.button("🌟 Gerar Apostila")
