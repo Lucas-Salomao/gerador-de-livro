@@ -37,7 +37,10 @@ def sidebar():
     """Cria a barra lateral e retorna os valores dos widgets."""
     with st.sidebar:
         st.logo("https://www.imagemhost.com.br/images/2024/11/22/Logo-novo-SENAI_-sem-slogan_755X325.md.png", size="large")
-        st.title("Bem vindo, "+st.user.given_name+"!")
+        if st.user.given_name:
+            st.title("Bem vindo, "+st.user.given_name+"!")
+        else:
+            st.logout()
         st.header("⚙️ Configurações")
 
         # generos_agrupados = {
