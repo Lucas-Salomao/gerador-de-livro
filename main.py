@@ -38,7 +38,8 @@ def sidebar():
     with st.sidebar:
         st.logo("https://www.imagemhost.com.br/images/2024/11/22/Logo-novo-SENAI_-sem-slogan_755X325.md.png", size="large")
         if st.user.given_name:
-            st.title("Bem vindo, "+st.user.given_name+"!")
+            # st.title("Bem vindo, "+st.user.given_name+"!")
+            st.title("Bem vindo, ")
         else:
             st.logout()
         st.header("⚙️ Configurações")
