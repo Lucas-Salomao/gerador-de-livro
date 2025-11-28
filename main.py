@@ -1,6 +1,18 @@
 import streamlit as st
 from agent import agent_book_generator
 import os
+import time
+import logging
+
+# --- CONFIGURAÇÕES DE LOGGING ---
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+# --- FIM DAS CONFIGURAÇÕES DE LOGGING ---
 
 st.set_page_config(
     page_title="Gerador de Apostila",
@@ -16,32 +28,15 @@ if 'final_result' not in st.session_state:
     st.session_state.final_result = None
 if 'book_path' not in st.session_state:
     st.session_state.book_path = None
-
-def check_token_expiration():
-    """
-    Verifica de forma segura se o token de login expirou.
-    Primeiro, garante que st.user e st.user.exp existam antes de fazer a verificação.
-    """
-    
-    # Esta é a verificação crucial para prevenir o erro
-    if not (st.user and hasattr(st.user, 'exp')):
-        # Se o objeto de usuário está inconsistente, força o logout por segurança
-        st.warning("Sessão inválida. Por favor, faça o login novamente.")
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        st.logout()
-        st.rerun()
-        return # Interrompe a execução da função
     
 def sidebar():
     """Cria a barra lateral e retorna os valores dos widgets."""
     with st.sidebar:
         st.logo("https://www.imagemhost.com.br/images/2024/11/22/Logo-novo-SENAI_-sem-slogan_755X325.md.png", size="large")
-        # if st.user.given_name:
-        #     # st.title("Bem vindo, "+st.user.given_name+"!")
-        #     st.title("Bem vindo, ")
-        # else:
-        #     st.logout()
+        if st.user.given_name:
+            st.title("Bem vindo, "+st.user.given_name+"!")
+        else:
+            st.logout()
         st.header("⚙️ Configurações")
 
         # generos_agrupados = {
@@ -189,6 +184,46 @@ def frontend():
         else:
             st.error(f"Ocorreu um erro no agente: {result.get('message')}")
 
+def check_token_expiration():
+    """
+    Verifica se o token de autenticação do usuário expirou.
+
+    Retorna True se o token for válido, False caso contrário.
+    Se for inválido, esta função também dispara o logout e o rerun.
+    """
+    try:
+        # Obter a hora atual como timestamp Unix (em segundos)
+        # O st.user.exp é um inteiro, então usamos int() para comparar
+        current_time = int(time.time())
+
+        # Condição 1: O usuário não existe ou não tem o atributo 'exp'
+        if not (st.user and hasattr(st.user, 'exp')):
+            logging.warning("Logout: Usuário não autenticado ou token sem 'exp'.")
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.logout()
+            st.rerun()
+            return False # Token inválido
+
+        # Condição 2: O token expirou (st.user.exp é ANTERIOR à hora atual)
+        if st.user.exp < current_time:
+            logging.warning(f"Logout: Token expirado. Exp: {st.user.exp}, Current: {current_time}")
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.logout()
+            st.rerun()
+            return False # Token inválido
+
+        # Se chegou aqui, o token é válido
+        logging.info(f"Check Token: Token válido. Expira em: {st.user.exp - current_time}s")
+        return True # Token válido
+    
+    except Exception as e:
+        logging.error(f"Erro ao verificar expiração do token: {e}")
+        st.logout()
+        st.rerun()
+        return False
+
 if __name__ == "__main__":
     if not (st.user and st.user.is_logged_in):
         st.markdown(
@@ -213,6 +248,10 @@ if __name__ == "__main__":
             if st.button("Entrar com Meu Senai", use_container_width=True):
                 st.login()
     else:
-        check_token_expiration()
-        
-        frontend()
+        # Se o usuário estiver logado, verifica a validade do token.
+        # A função check_token_expiration() cuida do logout e rerun se for inválido.
+        is_token_valid = check_token_expiration()
+
+        # Só executa a aplicação principal se o token for válido.
+        if is_token_valid:
+            frontend()
