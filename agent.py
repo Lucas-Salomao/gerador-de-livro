@@ -161,9 +161,10 @@ def create_outline(state: BookState, model) -> Dict[str, Any]:
          "chapter_description": f"Exploração inicial do tema {state['theme']}."}
     ])
     
-    if len(outline_data) < 5:
-        logger.warning("Sumário com menos de 5 capítulos. Adicionando capítulos extras.")
-        for i in range(len(outline_data) + 1, 6):
+    num_chapters = state.get("num_chapters", 5)
+    if len(outline_data) < num_chapters:
+        logger.warning(f"Sumário com menos de {num_chapters} capítulos. Adicionando capítulos extras.")
+        for i in range(len(outline_data) + 1, num_chapters + 1):
             outline_data.append({
                 "chapter_number": i,
                 "chapter_title": f"Capítulo {i}",
